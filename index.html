@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <title>Beredskaps Kart</title>
+    <meta property="og:description" content="Initialize a map in an HTML element with MapLibre GL JS." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.16.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.16.0/dist/maplibre-gl.js'></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div> 
+    <script>
+        const map = new maplibregl.Map({
+            container: 'map', // container id
+            style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json', // style URL
+            center: [8.0182, 58.1467], // starting position, Kristiansand [lng, lat]
+            zoom: 8, // starting zoom
+            maplibreLogo: true
+        });
+
+        map.on('load', () => {
+            // Add GeoJSON source and layer for brannalarmsentraler
+            map.addSource('brannalarmsentraler', {
+                type: 'geojson',
+                data: 'data/brannalarmsentraler.geojson'
+            });
+
+            // Add layer to visualize the brannalarmsentraler
+            map.addLayer({
+                id: 'brannalarmsentraler-layer',
+                type: 'circle',
+                source: 'brannalarmsentraler',
+                paint: {
+                    'circle-radius': 7,
+                    'circle-color': '#0000FF',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#FFFFFF'
+                }
+            });
+
+            // Add GeoJSON source and layer for trafikkulykker
+            map.addSource('trafikkulykker', {
+                type: 'geojson',
+                data: 'data/trafikkulykker.geojson'
+            });
+
+            // Add layer to visualize the trafikkulykker
+            map.addLayer({
+                id: 'trafikkulykker-layer',
+                type: 'circle',
+                source: 'trafikkulykker',
+                paint: {
+                    'circle-radius': 7,
+                    'circle-color': '#FF0000',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#FFFFFF'
+                }
+            });
+
+            // Add click event for brannalarmsentraler
+            map.on('click', 'brannalarmsentraler-layer', (e) => {
+                const polygon = e.features[0].geometry.coordinates[0]; // Assuming polygon geometry
+                const lng = (polygon[0][0] + polygon[2][0]) / 2; // Calculate center longitude
+                const lat = (polygon[0][1] + polygon[2][1]) / 2; // Calculate center latitude
+                const coordinates = [lng, lat]; // Center of the polygon
+
+                const props = e.features[0].properties; // Get properties
+
+                const description = `
+                    <strong>Navn:</strong> ${props.navn || "Ukjent"}<br/> 
+                    <strong>Sted:</strong> ${props.lokalisering || "Ukjent"}<br/>
+                    `;
+                
+                new maplibregl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(`<h3>Brannalarmsentral</h3><p>${description}</p>`)
+                    .addTo(map);
+            });
+            
+            // Add click event for trafikkulykker
+            map.on('click', 'trafikkulykker-layer', (e) => {
+                const coordinates = e.features[0].geometry.coordinates; // Point geometry
+                const props = e.features[0].properties;
+
+                const description = `
+                    <strong>Årsak:</strong> ${props.uhellskode || "Ukjent"}<br/> 
+                    <strong>Dato:</strong> ${props.ulykkesdato|| "Ukjent"}<br/>
+                    <strong>Alvorligste skadegrad:</strong> ${props.alvorligsteSkadegrad|| "Ukjent"}
+                    `;
+
+                new maplibregl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(`<h3>Trafikkulykke</h3><p>${description}</p>`)
+                    .addTo(map);
+            });
+
+        });
+
+    </script>
+</body>
+
+</html>
