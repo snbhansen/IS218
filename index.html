@@ -19,99 +19,60 @@
         #map {
             height: 100%;
         }
+
+        #layer-control {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            z-index: 1000;
+        }
+
+        #layer-control h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+
+        #layer-control label {
+            display: block;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+
+        #layer-control input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
     </style>
 </head>
 
 <body>
-    <div id="map"></div> 
-    <script>
-        const map = new maplibregl.Map({
-            container: 'map', // container id
-            style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json', // style URL
-            center: [8.0182, 58.1467], // starting position, Kristiansand [lng, lat]
-            zoom: 8, // starting zoom
-            maplibreLogo: true
-        });
-
-        map.on('load', () => {
-            // Add GeoJSON source and layer for brannalarmsentraler
-            map.addSource('brannalarmsentraler', {
-                type: 'geojson',
-                data: 'data/brannalarmsentraler.geojson'
-            });
-
-            // Add layer to visualize the brannalarmsentraler
-            map.addLayer({
-                id: 'brannalarmsentraler-layer',
-                type: 'circle',
-                source: 'brannalarmsentraler',
-                paint: {
-                    'circle-radius': 7,
-                    'circle-color': '#0000FF',
-                    'circle-stroke-width': 1,
-                    'circle-stroke-color': '#FFFFFF'
-                }
-            });
-
-            // Add GeoJSON source and layer for trafikkulykker
-            map.addSource('trafikkulykker', {
-                type: 'geojson',
-                data: 'data/trafikkulykker.geojson'
-            });
-
-            // Add layer to visualize the trafikkulykker
-            map.addLayer({
-                id: 'trafikkulykker-layer',
-                type: 'circle',
-                source: 'trafikkulykker',
-                paint: {
-                    'circle-radius': 7,
-                    'circle-color': '#FF0000',
-                    'circle-stroke-width': 1,
-                    'circle-stroke-color': '#FFFFFF'
-                }
-            });
-
-            // Add click event for brannalarmsentraler
-            map.on('click', 'brannalarmsentraler-layer', (e) => {
-                const polygon = e.features[0].geometry.coordinates[0]; // Assuming polygon geometry
-                const lng = (polygon[0][0] + polygon[2][0]) / 2; // Calculate center longitude
-                const lat = (polygon[0][1] + polygon[2][1]) / 2; // Calculate center latitude
-                const coordinates = [lng, lat]; // Center of the polygon
-
-                const props = e.features[0].properties; // Get properties
-
-                const description = `
-                    <strong>Navn:</strong> ${props.navn || "Ukjent"}<br/> 
-                    <strong>Sted:</strong> ${props.lokalisering || "Ukjent"}<br/>
-                    `;
-                
-                new maplibregl.Popup()
-                    .setLngLat(coordinates)
-                    .setHTML(`<h3>Brannalarmsentral</h3><p>${description}</p>`)
-                    .addTo(map);
-            });
-            
-            // Add click event for trafikkulykker
-            map.on('click', 'trafikkulykker-layer', (e) => {
-                const coordinates = e.features[0].geometry.coordinates; // Point geometry
-                const props = e.features[0].properties;
-
-                const description = `
-                    <strong>Årsak:</strong> ${props.uhellskode || "Ukjent"}<br/> 
-                    <strong>Dato:</strong> ${props.ulykkesdato|| "Ukjent"}<br/>
-                    <strong>Alvorligste skadegrad:</strong> ${props.alvorligsteSkadegrad|| "Ukjent"}
-                    `;
-
-                new maplibregl.Popup()
-                    .setLngLat(coordinates)
-                    .setHTML(`<h3>Trafikkulykke</h3><p>${description}</p>`)
-                    .addTo(map);
-            });
-
-        });
-
-    </script>
+    <div id="map"></div>
+    <div id="layer-control">
+        <h3>Lag</h3>
+        <label>
+            <input type="checkbox" id="toggle-wms-tilfluktsrom" checked />
+            Offentlige tilfluktsrom (WMS)
+        </label>
+        <label>
+            <input type="checkbox" id="toggle-wms-brannvesen" checked />
+            Interkommunale brannvesen (WMS)
+        </label>
+        <label>
+            <input type="checkbox" id="toggle-brannalarmsentraler" checked />
+            Brannalarmsentraler (GeoJSON)
+        </label>
+        <label>
+            <input type="checkbox" id="toggle-trafikkulykker" checked />
+            Trafikkulykker (GeoJSON)
+        </label>
+    </div>
+    <script src="./app.js"></script>
 </body>
 
 </html>
