@@ -102,8 +102,8 @@ map.on('load', () => {
 
         const description = `
             <strong>Årsak:</strong> ${props.uhellskode || "Ukjent"}<br/> 
-            <strong>Dato:</strong> ${props.ulykkesdato|| "Ukjent"}<br/>
-            <strong>Alvorligste skadegrad:</strong> ${props.alvorligsteSkadeGrad|| "Ukjent"}
+            <strong>Dato:</strong> ${props.ulykkesdato || "Ukjent"}<br/>
+            <strong>Alvorligste skadegrad:</strong> ${props.alvorligsteSkadeGrad || "Ukjent"}
             `;
 
         new maplibregl.Popup()
