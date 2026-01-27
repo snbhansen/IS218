@@ -440,11 +440,28 @@
             color: white;
         }
 
-        .hidden {
-            display: none;
+        .transport-toggles {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
         }
 
-        /* --- Intro Overlay (Video Landing) --- */
+        .mode-btn {
+            flex: 1;
+            padding: 12px;
+            background: var(--input-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .mode-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
         #intro-overlay {
             position: fixed;
             top: 0;
@@ -453,13 +470,11 @@
             height: 100%;
             z-index: 9999;
             background: #0f172a;
-            /* Slate-900 fallback */
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: white;
-            transition: opacity 0.8s ease-out, visibility 0.8s;
+            transition: opacity 0.8s;
         }
 
         #intro-video {
@@ -470,7 +485,6 @@
             height: 100%;
             object-fit: cover;
             opacity: 0.5;
-            /* Dempet bakgrunnsvideo */
             z-index: -1;
         }
 
@@ -478,75 +492,150 @@
             position: relative;
             z-index: 1;
             text-align: center;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            padding: 50px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            background: rgba(15, 23, 42, 0.75);
-            /* Slate-900 semi-transparent */
-            border-radius: 16px;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
-            max-width: 600px;
-            width: 90%;
-            border-top: 1px solid rgba(148, 163, 184, 0.3);
         }
 
         .intro-title {
-            font-size: 3.5rem;
+            font-size: 4rem;
             font-weight: 800;
-            margin: 0 0 15px 0;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: #f8fafc;
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            letter-spacing: 4px;
+            color: #fff;
+            margin: 0;
         }
 
         .intro-subtitle {
-            font-size: 1.25rem;
-            color: #cbd5e1;
-            margin-bottom: 40px;
-            font-weight: 400;
+            font-size: 1.2rem;
+            margin-top: 10px;
+            color: #94a3b8;
             letter-spacing: 2px;
-            text-transform: uppercase;
-            border-bottom: 2px solid #2563eb;
-            display: inline-block;
-            padding-bottom: 10px;
         }
 
+        /* Animated Start Button */
         #btn-enter-app {
-            padding: 18px 48px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #fff;
-            background: #2563eb;
-            border: 1px solid #3b82f6;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 40px;
+            padding: 16px 48px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: white;
+            /* Semi-transparent background */
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.35) 100%);
+            /* Glass blur effect */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            /* Stronger border for visibility */
+            border-radius: 8px;
+            box-shadow: 0 10px 30px -5px rgba(59, 130, 246, 0.3),
+                0 0 0 0 rgba(59, 130, 246, 0.5);
+            letter-spacing: 2px;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+        }
+
+        /* Shine effect */
+        #btn-enter-app::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.1),
+                    transparent);
+            transition: left 0.5s;
+        }
+
+        #btn-enter-app:hover::before {
+            left: 100%;
         }
 
         #btn-enter-app:hover {
-            background: #1d4ed8;
-            transform: translateY(-2px);
-            box-shadow: 0 0 35px rgba(37, 99, 235, 0.7);
+            transform: scale(1.1) translateY(-4px);
+            /* Moves closer and gets brighter */
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.5) 0%, rgba(37, 99, 235, 0.6) 100%);
+            border-color: rgba(59, 130, 246, 0.8);
+            box-shadow: 0 20px 40px -5px rgba(59, 130, 246, 0.6),
+                0 0 0 10px rgba(59, 130, 246, 0.1);
+            /* Pulse ring effect */
+            letter-spacing: 4px;
+            /* Expands text */
         }
 
-        /* Klasse for å skjule overlay */
+        #btn-enter-app:active {
+            transform: scale(0.95) translateY(2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(59, 130, 246, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+
+        #btn-enter-app {
+            animation: pulse-glow 2s infinite;
+        }
+
         .fade-out {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
         }
+
+        /* Utilities */
+        .divider-text {
+            text-align: center;
+            margin: 5px 0;
+            font-size: 0.8em;
+            color: var(--text-muted);
+        }
+
+        .input-label {
+            font-size: 0.8em;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        #result-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid var(--primary-color);
+            border-radius: 4px;
+            display: none;
+        }
     </style>
 </head>
 
 <body>
+    <!-- HEADER -->
+    <header id="top-header">
+        <div class="header-title">
+            <i class="fa-solid fa-circle-nodes" style="font-size: 1.25rem;"></i>
+            Beredskapskart <span style="font-weight: 300; opacity: 0.7; font-size: 0.8em; margin-left: 10px;">|
+                Oversikt</span>
+        </div>
+        <button class="theme-toggle" id="theme-switch" title="Bytt tema"><i class="fa-solid fa-moon"></i></button>
+    </header>
+
     <!-- INTRO OVERLAY -->
     <div id="intro-overlay">
-        <!-- Video må escape mellomrom med %20 -->
         <video autoplay muted loop playsinline id="intro-video">
             <source src="Smooth%20background%20video%20for%20beredskap.mp4" type="video/mp4">
         </video>
