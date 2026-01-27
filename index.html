@@ -5,17 +5,26 @@
     <title>Beredskaps Kart</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
     <script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
-    
+
     <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
     <style>
-        body { margin: 0; padding: 0; font-family: 'Inter', Arial, sans-serif; }
-        html, body, #map { height: 100%; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', Arial, sans-serif;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
 
         /* --- UI Container (Venstre side) --- */
         #ui-container {
@@ -34,50 +43,215 @@
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         /* --- Seksjon 1: Lagkontroll (Gruppens kode) --- */
-        #layer-control h3 { margin: 0 0 10px 0; font-size: 16px; }
-        #layer-control label { display: block; margin: 5px 0; cursor: pointer; font-size: 14px; }
+        #layer-control h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+
+        #layer-control label {
+            display: block;
+            margin: 5px 0;
+            cursor: pointer;
+            font-size: 14px;
+        }
 
         /* --- Seksjon 2: Søk og Ruting (Din kode) --- */
-        .search-box { display: flex; gap: 5px; margin-bottom: 10px; }
+        .search-box {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
         input[type="text"] {
-            flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
+
         button {
-            padding: 8px 12px; border: none; background: #2563eb; color: white;
-            border-radius: 4px; cursor: pointer; font-weight: bold;
+            padding: 8px 12px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
         }
-        button:hover { background: #1d4ed8; }
+
+        button:hover {
+            background: #1d4ed8;
+        }
 
         select {
-            width: 100%; padding: 8px; margin-bottom: 10px;
-            border: 1px solid #ccc; border-radius: 4px;
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
 
-        .transport-toggles { display: flex; gap: 5px; margin-top: 10px; }
-        .mode-btn {
-            flex: 1; background: #f1f5f9; color: #333; border: 1px solid #ccc;
+        .transport-toggles {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
         }
-        .mode-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+        .mode-btn {
+            flex: 1;
+            background: #f1f5f9;
+            color: #333;
+            border: 1px solid #ccc;
+        }
+
+        .mode-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
 
         /* Resultatboks (skjult til vanlig) */
-        #result-area { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: none; }
-        .res-highlight { font-size: 1.2rem; font-weight: bold; color: #166534; }
-        .hidden { display: none; }
+        #result-area {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            display: none;
+        }
+
+        .res-highlight {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #166534;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* --- Intro Overlay (Video Landing) --- */
+        #intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: #0f172a;
+            /* Slate-900 fallback */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            transition: opacity 0.8s ease-out, visibility 0.8s;
+        }
+
+        #intro-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.5;
+            /* Dempet bakgrunnsvideo */
+            z-index: -1;
+        }
+
+        .intro-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(15, 23, 42, 0.75);
+            /* Slate-900 semi-transparent */
+            border-radius: 16px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            max-width: 600px;
+            width: 90%;
+            border-top: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+        .intro-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin: 0 0 15px 0;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #f8fafc;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .intro-subtitle {
+            font-size: 1.25rem;
+            color: #cbd5e1;
+            margin-bottom: 40px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #2563eb;
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        #btn-enter-app {
+            padding: 18px 48px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            background: #2563eb;
+            border: 1px solid #3b82f6;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+        }
+
+        #btn-enter-app:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 0 35px rgba(37, 99, 235, 0.7);
+        }
+
+        /* Klasse for å skjule overlay */
+        .fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
     </style>
 </head>
 
 <body>
+    <!-- INTRO OVERLAY -->
+    <div id="intro-overlay">
+        <!-- Video må escape mellomrom med %20 -->
+        <video autoplay muted loop playsinline id="intro-video">
+            <source src="Smooth%20background%20video%20for%20beredskap.mp4" type="video/mp4">
+        </video>
+        <div class="intro-content">
+            <h1 class="intro-title">BEREDSKAPSKART</h1>
+            <p class="intro-subtitle">NASJONAL KRISEHÅNDTERING OG ETTERRETNING</p>
+            <button id="btn-enter-app">START SYSTEM</button>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <div id="ui-container">
-        
+
         <div class="panel-box">
             <h3><i class="fa-solid fa-route"></i> Finn Beredskap</h3>
-            
+
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Søk adresse...">
                 <button id="btn-search"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -99,7 +273,8 @@
             </select>
 
             <div class="transport-toggles">
-                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i> Gå</button>
+                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i>
+                    Gå</button>
                 <button class="mode-btn" data-mode="driving"><i class="fa-solid fa-car"></i> Kjør</button>
             </div>
 
@@ -114,7 +289,8 @@
             <h3>Visning (Lag)</h3>
             <label><input type="checkbox" id="toggle-wms-tilfluktsrom" checked /> Offentlige tilfluktsrom (WMS)</label>
             <label><input type="checkbox" id="toggle-wms-brannvesen" checked /> Interkommunale brannvesen (WMS)</label>
-            <label><input type="checkbox" id="toggle-brannalarmsentraler" checked /> Brannalarmsentraler (GeoJSON)</label>
+            <label><input type="checkbox" id="toggle-brannalarmsentraler" checked /> Brannalarmsentraler
+                (GeoJSON)</label>
             <label><input type="checkbox" id="toggle-trafikkulykker" checked /> Trafikkulykker (GeoJSON)</label>
         </div>
 
@@ -122,4 +298,5 @@
 
     <script src="./app.js"></script>
 </body>
+
 </html>
