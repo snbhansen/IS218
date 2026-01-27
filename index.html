@@ -650,52 +650,138 @@
 
     <div id="ui-container">
 
-        <div class="panel-box">
-            <h3><i class="fa-solid fa-route"></i> Finn Beredskap</h3>
+        <!-- Minimized Handle (Left) -->
+        <div id="maximize-handle-left" onclick="toggleMinimizeLeft()">
+            <i class="fa-solid fa-satellite-dish"></i>
+        </div>
 
+        <!-- SEARCH PANEL -->
+        <div class="panel-box">
+            <h3>
+                <i class="fa-solid fa-satellite-dish"></i> Operasjonelt Søk
+                <button class="minimize-btn" onclick="toggleMinimizeLeft()"><i class="fa-solid fa-minus"></i></button>
+            </h3>
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="Søk adresse...">
+                <input type="text" id="search-input" placeholder="Søk posisjon / adresse...">
                 <button id="btn-search"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
+            <div class="divider-text">- ELLER -</div>
+            <button id="btn-find-me"><i class="fa-solid fa-location-crosshairs"></i> Lokaliser Enhet</button>
 
-            <div style="text-align: center; margin: 5px 0; font-size: 0.8em; color: #666;">- eller -</div>
-
-            <button id="btn-find-me" style="width: 100%; background: #0f172a;">
-                <i class="fa-solid fa-location-arrow"></i> Bruk min posisjon
-            </button>
-
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-
-            <label for="target-category" style="font-size: 0.9em; font-weight: bold;">Hva leter du etter?</label>
-            <select id="target-category">
-                <option value="bomberom">Nærmeste Tilfluktsrom</option>
-                <option value="brann">Nærmeste Brannalarmsentral</option>
-                <option value="ulykke">Nærmeste Ulykkespunkt (Test)</option>
-            </select>
+            <div style="margin-top: 20px;">
+                <label class="input-label">Mål Kategori</label>
+                <select id="target-category">
+                    <option value="bomberom">Tilfluktsrom (Sivilforsvar)</option>
+                    <option value="brann">Brannalarmsentral (110)</option>
+                    <option value="ulykke">Trafikkhendelse (SVV)</option>
+                </select>
+            </div>
 
             <div class="transport-toggles">
-                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i>
-                    Gå</button>
-                <button class="mode-btn" data-mode="driving"><i class="fa-solid fa-car"></i> Kjør</button>
+                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-military-pointing"></i>
+                    Fot</button>
+                <button class="mode-btn" data-mode="driving"><i class="fa-solid fa-truck-medical"></i> Kjøretøy</button>
             </div>
 
             <div id="result-area">
-                <div style="font-size: 0.9em; color: #555;">Distanse / Tid:</div>
-                <div id="res-info" class="res-highlight">-</div>
-                <div id="res-dest" style="font-size: 0.85em; margin-top: 4px;"></div>
+                <div style="font-size: 0.8em; color: var(--text-muted);">Estimat:</div>
+                <div id="res-info" class="res-highlight"
+                    style="font-size: 1.2rem; font-weight: 800; color: var(--primary-color);">-</div>
+                <div id="res-dest" style="font-size: 0.8rem; margin-top: 4px;"></div>
             </div>
         </div>
 
-        <div class="panel-box" id="layer-control">
-            <h3>Visning (Lag)</h3>
-            <label><input type="checkbox" id="toggle-wms-tilfluktsrom" checked /> Offentlige tilfluktsrom (WMS)</label>
-            <label><input type="checkbox" id="toggle-wms-brannvesen" checked /> Interkommunale brannvesen (WMS)</label>
-            <label><input type="checkbox" id="toggle-brannalarmsentraler" checked /> Brannalarmsentraler
-                (GeoJSON)</label>
-            <label><input type="checkbox" id="toggle-trafikkulykker" checked /> Trafikkulykker (GeoJSON)</label>
+    </div>
+
+    <!-- RIGHT PANEL CONTAINER -->
+    <div id="ui-right">
+        <div id="maximize-handle" onclick="toggleMinimize()">
+            <i class="fa-solid fa-tower-broadcast"></i>
         </div>
 
+        <!-- NEW SIGNAL LAYERS PANEL -->
+        <div class="panel-box" id="layer-control">
+            <h3>
+                <i class="fa-solid fa-tower-broadcast"></i> Signalkilder (Live)
+                <button class="minimize-btn" onclick="toggleMinimize()"><i class="fa-solid fa-minus"></i></button>
+            </h3>
+
+            <!-- 1. Green Signal -->
+            <div class="signal-row">
+                <div class="signal-left">
+                    <div class="signal-icon icon-green"><i class="fa-solid fa-person-shelter"></i></div>
+                    <div class="signal-info">
+                        <div class="sig-title">Offentlige tilfluktsrom</div>
+                        <div class="sig-sub">Oppdatert: 2 min siden</div>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-wms-tilfluktsrom" checked>
+                    <span class="slider green"></span>
+                </label>
+            </div>
+
+            <!-- 2. Orange Signal -->
+            <div class="signal-row">
+                <div class="signal-left">
+                    <div class="signal-icon icon-orange"><i class="fa-solid fa-fire-burner"></i></div>
+                    <!-- Using fire icon -->
+                    <div class="signal-info">
+                        <div class="sig-title">Aktive brannalarmer</div>
+                        <div class="sig-sub">Direkte varsling</div>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-brannalarmsentraler" checked> <!-- Kept ID map logic -->
+                    <span class="slider orange"></span>
+                </label>
+            </div>
+
+            <!-- 3. Red Signal -->
+            <div class="signal-row">
+                <div class="signal-left">
+                    <div class="signal-icon icon-red"><i class="fa-solid fa-car-burst"></i></div>
+                    <div class="signal-info">
+                        <div class="sig-title">Trafikkulykker</div>
+                        <div class="sig-sub">Vegvesen API - Live</div>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-trafikkulykker" checked>
+                    <span class="slider red"></span>
+                </label>
+            </div>
+
+            <!-- 4. Blue Signal -->
+            <div class="signal-row">
+                <div class="signal-left">
+                    <div class="signal-icon icon-blue"><i class="fa-regular fa-building"></i></div>
+                    <div class="signal-info">
+                        <div class="sig-title">Brannvesen (IKS)</div>
+                        <div class="sig-sub">Stasjonær enheter</div>
+                    </div>
+                </div>
+                <!-- Note: using hidden toggle logic for brannvesen wms if needed, or mapping it to checkbox -->
+                <label class="switch">
+                    <input type="checkbox" id="toggle-wms-brannvesen" checked>
+                    <span class="slider blue"></span>
+                </label>
+            </div>
+
+            <div class="panel-footer">
+                SIST OPPDATERT: <span id="last-update">23:29:57</span>
+            </div>
+        </div>
     </div>
+
+    <script>
+        function toggleMinimize() {
+            document.getElementById('ui-right').classList.toggle('minimized');
+        }
+        function toggleMinimizeLeft() {
+            document.getElementById('ui-container').classList.toggle('minimized');
+        }
+    </script>
 
     <script src="./app.js"></script>
 </body>
