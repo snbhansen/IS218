@@ -414,21 +414,30 @@
             padding: 0 18px;
             background: var(--primary-color);
             color: white;
-            border-color: #2563eb;
+            border-radius: 8px;
         }
 
-        /* Resultatboks (skjult til vanlig) */
-        #result-area {
+        button#btn-search:hover {
+            background: var(--primary-hover);
+        }
+
+        #btn-find-me {
+            width: 100%;
+            padding: 14px;
+            background: var(--input-bg);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            border-radius: 8px;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
             margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #eee;
-            display: none;
         }
 
-        .res-highlight {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #166534;
+        #btn-find-me:hover {
+            background: var(--primary-color);
+            color: white;
         }
 
         .hidden {
