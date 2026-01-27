@@ -68,9 +68,9 @@ map.on('load', async () => {
                 id: 'brannalarmsentraler-fill',
                 type: 'fill',
                 source: 'brannalarmsentraler',
-                paint: { 
+                paint: {
                     'fill-color': '#FFA500',
-                    'fill-opacity': 0.3 
+                    'fill-opacity': 0.3
                 }
             });
 
@@ -274,3 +274,20 @@ async function calculateRoute() {
         console.error("Ruting feilet:", err);
     }
 }
+
+// -------------------------------------------------------------
+// 6. INTRO OVERLAY LOGIKK
+// -------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    const btnEnter = document.getElementById('btn-enter-app');
+    const overlay = document.getElementById('intro-overlay');
+
+    if (btnEnter && overlay) {
+        btnEnter.addEventListener('click', () => {
+            overlay.classList.add('fade-out');
+
+            // Start video/animasjoner på hovedsiden hvis nødvendig
+            console.log("System started.");
+        });
+    }
+});
