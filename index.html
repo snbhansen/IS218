@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <title>Beredskaps Kart</title>
+    <meta property="og:description" content="Initialize a map in an HTML element with MapLibre GL JS." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.16.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.16.0/dist/maplibre-gl.js'></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+
+        #layer-control {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            z-index: 1000;
+        }
+
+        #layer-control h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+
+        #layer-control label {
+            display: block;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+
+        #layer-control input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="layer-control">
+        <h3>Lag</h3>
+        <label>
+            <input type="checkbox" id="toggle-wms-tilfluktsrom" checked />
+            Offentlige tilfluktsrom (WMS)
+        </label>
+        <label>
+            <input type="checkbox" id="toggle-wms-brannvesen" checked />
+            Interkommunale brannvesen (WMS)
+        </label>
+        <label>
+            <input type="checkbox" id="toggle-brannalarmsentraler" checked />
+            Brannalarmsentraler (GeoJSON)
+        </label>
+        <label>
+            <input type="checkbox" id="toggle-trafikkulykker" checked />
+            Trafikkulykker (GeoJSON)
+        </label>
+    </div>
+    <script src="./app.js"></script>
+</body>
+
+</html>
