@@ -141,29 +141,92 @@
             padding-bottom: 20px;
         }
 
-        /* Felles stil for bokser */
-        .panel-box {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        /* --- Signal Panel (Floating Right) --- */
+        #ui-right {
+            position: absolute;
+            top: 90px;
+            right: 24px;
+            width: 360px;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* --- Seksjon 1: Lagkontroll (Gruppens kode) --- */
-        #layer-control h3 {
-            margin: 0 0 10px 0;
-            font-size: 16px;
+        /* Minimized State */
+        #ui-right.minimized {
+            width: auto;
         }
 
-        #layer-control label {
-            display: block;
-            margin: 5px 0;
+        /* Hide the main panels when minimized */
+        #ui-right.minimized #layer-control,
+        #ui-container.minimized .panel-box {
+            display: none;
+        }
+
+        /* Minimized State for Left Panel */
+        #ui-container.minimized {
+            width: auto;
+            overflow: visible;
+            /* Allow handle to be seen clearly */
+        }
+
+        /* Shared Handle Style */
+        #maximize-handle,
+        #maximize-handle-left {
+            display: none;
             cursor: pointer;
-            font-size: 14px;
+            padding: 12px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--primary-color);
+            backdrop-filter: blur(12px);
+            font-size: 1.2rem;
+            box-shadow: var(--shadow-md);
         }
 
-        /* --- Seksjon 2: Søk og Ruting (Din kode) --- */
-        .search-box {
+        /* Show handles when minimized */
+        #ui-right.minimized #maximize-handle,
+        #ui-container.minimized #maximize-handle-left {
+            display: block;
+        }
+
+        .minimize-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            float: right;
+            transition: color 0.2s;
+        }
+
+        .minimize-btn:hover {
+            color: var(--text-color);
+        }
+
+        /* --- Panels --- */
+        .panel-box {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+        }
+
+        .panel-box h3 {
+            margin: 0 0 20px 0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        /* --- New Signal Panel Styling --- */
+        .signal-row {
             display: flex;
             gap: 5px;
             margin-bottom: 10px;
