@@ -65,10 +65,23 @@ map.on('load', async () => {
             dataCache.brann = json;
             map.addSource('brannalarmsentraler', { type: 'geojson', data: json });
             map.addLayer({
-                id: 'brannalarmsentraler-layer',
-                type: 'circle',
+                id: 'brannalarmsentraler-fill',
+                type: 'fill',
                 source: 'brannalarmsentraler',
-                paint: { 'circle-radius': 6, 'circle-color': '#0000FF', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
+                paint: { 
+                    'fill-color': '#FFA500',
+                    'fill-opacity': 0.3 
+                }
+            });
+
+            map.addLayer({
+                id: 'brannalarmsentraler-outline',
+                type: 'line',
+                source: 'brannalarmsentraler',
+                paint: {
+                    'line-color': '#ff8c00c2',
+                    'line-width': 2
+                }
             });
         }
     } catch (e) { console.warn(e); }
@@ -123,7 +136,7 @@ map.on('load', async () => {
 // -------------------------------------------------------------
 // 3. INTERAKSJON (Popups)
 // -------------------------------------------------------------
-map.on('click', 'brannalarmsentraler-layer', (e) => {
+map.on('click', 'brannalarmsentraler-fill', (e) => {
     const p = e.features[0].properties;
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${p.navn || 'Brannsentral'}</b><br>${p.lokalisering || ''}`).addTo(map);
 });
@@ -173,7 +186,8 @@ function setupControls() {
     const toggles = [
         { id: 'toggle-wms-tilfluktsrom', layer: 'wms-tilfluktsrom-layer' },
         { id: 'toggle-wms-brannvesen', layer: 'wms-brannvesen-layer' },
-        { id: 'toggle-brannalarmsentraler', layer: 'brannalarmsentraler-layer' },
+        { id: 'toggle-brannalarmsentraler', layer: 'brannalarmsentraler-fill' },
+        { id: 'toggle-brannalarmsentraler-outline', layer: 'brannalarmsentraler-outline' },
         { id: 'toggle-trafikkulykker', layer: 'trafikkulykker-layer' }
     ];
     toggles.forEach(t => {
