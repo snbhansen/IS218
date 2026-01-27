@@ -326,22 +326,68 @@
         .slider {
             position: absolute;
             cursor: pointer;
-            font-weight: bold;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #334155;
+            transition: .3s;
+            border-radius: 26px;
         }
 
-        button:hover {
-            background: #1d4ed8;
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
-        select {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+        /* Toggle Colors */
+        input:checked+.slider.green {
+            background-color: var(--sig-green);
         }
 
-        .transport-toggles {
+        input:checked+.slider.orange {
+            background-color: var(--sig-orange);
+        }
+
+        input:checked+.slider.red {
+            background-color: var(--sig-red);
+        }
+
+        input:checked+.slider.blue {
+            background-color: var(--sig-blue);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(18px);
+        }
+
+        /* Light mode switch off state color fix */
+        [data-theme="light"] .slider {
+            background-color: #cbd5e1;
+        }
+
+        .panel-footer {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: monospace;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+        }
+
+        /* --- Original Styles Preserved (Search, Buttons etc) --- */
+        .search-box {
             display: flex;
             gap: 5px;
             margin-top: 10px;
