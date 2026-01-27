@@ -51,7 +51,7 @@ map.on('load', async () => {
 
     // SHELTERS
     try {
-        const res = await fetch('data/bomberom.geojson');
+        const res = await fetch('data/TilfluktsromOffentlig.json');
         if (res.ok) dataCache.bomberom = await res.json();
     } catch (e) { console.warn("Missing data/bomberom.geojson"); }
 
@@ -82,25 +82,10 @@ map.on('load', async () => {
                 id: 'trafikkulykker-layer',
                 type: 'circle',
                 source: 'trafikkulykker',
-                paint: { 'circle-radius': 6, 'circle-color': '#FF0000', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
+                paint: { 'circle-radius': 6, 'circle-color': '#ef4444', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
             });
         }
     } catch (e) { console.warn(e); }
-
-    // WMS LAYERS
-    map.addSource('wms-tilfluktsrom', {
-        type: 'raster',
-        tiles: ['https://ogc.dsb.no/wms.ashx?service=WMS&version=1.3.0&request=GetMap&layers=layer_340&bbox={bbox-epsg-3857}&width=256&height=256&crs=EPSG:3857&transparent=true&format=image/png'],
-        tileSize: 256
-    });
-    map.addLayer({ id: 'wms-tilfluktsrom-layer', type: 'raster', source: 'wms-tilfluktsrom', paint: {} });
-
-    map.addSource('wms-brannvesen', {
-        type: 'raster',
-        tiles: ['https://ogc.dsb.no/wms.ashx?service=WMS&version=1.3.0&request=GetMap&layers=layer_179&bbox={bbox-epsg-3857}&width=256&height=256&crs=EPSG:3857&transparent=true&format=image/png'],
-        tileSize: 256
-    });
-    map.addLayer({ id: 'wms-brannvesen-layer', type: 'raster', source: 'wms-brannvesen', paint: {} });
 
     // ROUTE LINE
     map.addSource('route', {
@@ -118,16 +103,98 @@ map.on('load', async () => {
     setupControls();
 });
 
-// INTERACTION
+// LOAD GEOJSON LAYERS
+map.on('load', () => {
+    // Create yellow square icon with T
+    const canvas = document.createElement('canvas');
+    canvas.width = 40;
+    canvas.height = 40;
+    const ctx = canvas.getContext('2d');
+    
+    // Yellow background
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(2, 2, 36, 36);
+    
+    // Black border
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, 36, 36);
+    
+    // Add T text
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('T', 20, 20);
+    
+    map.addImage('tilfluktsrom-icon', ctx.getImageData(0, 0, 40, 40));
+
+    // Load all GeoJSON layers after map is ready
+    fetch('./data/brannalarmsentraler.geojson').then(r => r.json()).then(data => {
+        map.addSource('brannalarmsentraler-source', { type: 'geojson', data: data });
+        map.addLayer({
+            id: 'brannalarmsentraler-layer',
+            type: 'circle',
+            source: 'brannalarmsentraler-source',
+            paint: { 'circle-radius': 6, 'circle-color': '#ff6b6b' }
+        });
+    });
+
+    fetch('./data/trafikkulykker.geojson').then(r => r.json()).then(data => {
+        map.addSource('trafikkulykker-source', { type: 'geojson', data: data });
+        map.addLayer({
+            id: 'trafikkulykker-layer',
+            type: 'circle',
+            source: 'trafikkulykker-source',
+            paint: { 'circle-radius': 5, 'circle-color': '#ef4444' }
+        });
+    });
+
+    fetch('./data/TilfluktsromOffentlig.json').then(r => r.json()).then(data => {
+        map.addSource('tilfluktsrom-source', { type: 'geojson', data: data });
+        map.addLayer({
+            id: 'tilfluktsrom-layer',
+            type: 'symbol',
+            source: 'tilfluktsrom-source',
+            layout: {
+                'icon-image': 'tilfluktsrom-icon',
+                'icon-size': 1,
+                'text-field': 'T',
+                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                'text-size': 14,
+                'text-offset': [0, 0],
+                'text-anchor': 'center'
+            },
+            paint: {
+                'text-color': '#000000'
+            }
+        });
+    });
+});
+
+// INTERACTION - Register click handlers
 map.on('click', 'brannalarmsentraler-layer', (e) => {
     const p = e.features[0].properties;
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${p.navn || 'Fire Station'}</b><br>${p.lokalisering || ''}`).addTo(map);
 });
+
 map.on('click', 'trafikkulykker-layer', (e) => {
     const p = e.features[0].properties;
     const date = p.ulykkesdato ? `<br>Date: ${p.ulykkesdato}` : '';
     const weekday = p.ukedag ? ` (${p.ukedag})` : '';
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Accident</b>${date}${weekday}<br>${p.uhellskode || ''}`).addTo(map);
+});
+
+map.on('click', 'tilfluktsrom-layer', (e) => {
+    const p = e.features[0].properties;
+    const plasser = p.plasser ? `<br><b>Capacity:</b> ${p.plasser} people` : '';
+    const romnr = p.romnr ? `<br><b>Room:</b> ${p.romnr}` : '';
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Shelter</b><br><b>Address:</b> ${p.adresse || 'N/A'}${romnr}${plasser}`).addTo(map);
+});
+
+// LAYER TOGGLE
+document.getElementById('toggle-tilfluktsrom').addEventListener('change', (e) => {
+    map.setLayoutProperty('tilfluktsrom-layer', 'visibility', e.target.checked ? 'visible' : 'none');
 });
 
 // BUTTONS AND UI
@@ -175,7 +242,6 @@ function setupControls() {
 
     // Layer control
     const toggles = [
-        { id: 'toggle-wms-tilfluktsrom', layer: 'wms-tilfluktsrom-layer' },
         { id: 'toggle-wms-brannvesen', layer: 'wms-brannvesen-layer' },
         { id: 'toggle-brannalarmsentraler', layer: 'brannalarmsentraler-layer' },
         { id: 'toggle-trafikkulykker', layer: 'trafikkulykker-layer' }
