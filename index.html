@@ -3,76 +3,123 @@
 
 <head>
     <title>Beredskaps Kart</title>
-    <meta property="og:description" content="Initialize a map in an HTML element with MapLibre GL JS." />
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.16.0/dist/maplibre-gl.css' />
-    <script src='https://unpkg.com/maplibre-gl@5.16.0/dist/maplibre-gl.js'></script>
+    
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
+    
+    <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-        }
+        body { margin: 0; padding: 0; font-family: 'Inter', Arial, sans-serif; }
+        html, body, #map { height: 100%; }
 
-        html,
-        body,
-        #map {
-            height: 100%;
-        }
-
-        #layer-control {
+        /* --- UI Container (Venstre side) --- */
+        #ui-container {
             position: absolute;
             top: 10px;
             left: 10px;
-            background: white;
-            padding: 15px;
-            border-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-            font-family: Arial, sans-serif;
-            font-size: 14px;
+            width: 320px;
             z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
-        #layer-control h3 {
-            margin: 0 0 10px 0;
-            font-size: 16px;
+        /* Felles stil for bokser */
+        .panel-box {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
-        #layer-control label {
-            display: block;
-            margin: 8px 0;
-            cursor: pointer;
+        /* --- Seksjon 1: Lagkontroll (Gruppens kode) --- */
+        #layer-control h3 { margin: 0 0 10px 0; font-size: 16px; }
+        #layer-control label { display: block; margin: 5px 0; cursor: pointer; font-size: 14px; }
+
+        /* --- Seksjon 2: Søk og Ruting (Din kode) --- */
+        .search-box { display: flex; gap: 5px; margin-bottom: 10px; }
+        input[type="text"] {
+            flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        button {
+            padding: 8px 12px; border: none; background: #2563eb; color: white;
+            border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+        button:hover { background: #1d4ed8; }
+
+        select {
+            width: 100%; padding: 8px; margin-bottom: 10px;
+            border: 1px solid #ccc; border-radius: 4px;
         }
 
-        #layer-control input[type="checkbox"] {
-            margin-right: 8px;
-            cursor: pointer;
+        .transport-toggles { display: flex; gap: 5px; margin-top: 10px; }
+        .mode-btn {
+            flex: 1; background: #f1f5f9; color: #333; border: 1px solid #ccc;
         }
+        .mode-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+        /* Resultatboks (skjult til vanlig) */
+        #result-area { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: none; }
+        .res-highlight { font-size: 1.2rem; font-weight: bold; color: #166534; }
+        .hidden { display: none; }
     </style>
 </head>
 
 <body>
     <div id="map"></div>
-    <div id="layer-control">
-        <h3>Lag</h3>
-        <label>
-            <input type="checkbox" id="toggle-wms-tilfluktsrom" checked />
-            Offentlige tilfluktsrom (WMS)
-        </label>
-        <label>
-            <input type="checkbox" id="toggle-wms-brannvesen" checked />
-            Interkommunale brannvesen (WMS)
-        </label>
-        <label>
-            <input type="checkbox" id="toggle-brannalarmsentraler" checked />
-            Brannalarmsentraler (GeoJSON)
-        </label>
-        <label>
-            <input type="checkbox" id="toggle-trafikkulykker" checked />
-            Trafikkulykker (GeoJSON)
-        </label>
+
+    <div id="ui-container">
+        
+        <div class="panel-box">
+            <h3><i class="fa-solid fa-route"></i> Finn Beredskap</h3>
+            
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Søk adresse...">
+                <button id="btn-search"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </div>
+
+            <div style="text-align: center; margin: 5px 0; font-size: 0.8em; color: #666;">- eller -</div>
+
+            <button id="btn-find-me" style="width: 100%; background: #0f172a;">
+                <i class="fa-solid fa-location-arrow"></i> Bruk min posisjon
+            </button>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+            <label for="target-category" style="font-size: 0.9em; font-weight: bold;">Hva leter du etter?</label>
+            <select id="target-category">
+                <option value="bomberom">Nærmeste Tilfluktsrom</option>
+                <option value="brann">Nærmeste Brannalarmsentral</option>
+                <option value="ulykke">Nærmeste Ulykkespunkt (Test)</option>
+            </select>
+
+            <div class="transport-toggles">
+                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i> Gå</button>
+                <button class="mode-btn" data-mode="driving"><i class="fa-solid fa-car"></i> Kjør</button>
+            </div>
+
+            <div id="result-area">
+                <div style="font-size: 0.9em; color: #555;">Distanse / Tid:</div>
+                <div id="res-info" class="res-highlight">-</div>
+                <div id="res-dest" style="font-size: 0.85em; margin-top: 4px;"></div>
+            </div>
+        </div>
+
+        <div class="panel-box" id="layer-control">
+            <h3>Visning (Lag)</h3>
+            <label><input type="checkbox" id="toggle-wms-tilfluktsrom" checked /> Offentlige tilfluktsrom (WMS)</label>
+            <label><input type="checkbox" id="toggle-wms-brannvesen" checked /> Interkommunale brannvesen (WMS)</label>
+            <label><input type="checkbox" id="toggle-brannalarmsentraler" checked /> Brannalarmsentraler (GeoJSON)</label>
+            <label><input type="checkbox" id="toggle-trafikkulykker" checked /> Trafikkulykker (GeoJSON)</label>
+        </div>
+
     </div>
+
     <script src="./app.js"></script>
 </body>
-
 </html>
