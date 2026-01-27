@@ -1,7 +1,7 @@
-// --- GLOBALE VARIABLER ---
+// GLOBAL VARIABLES
 let map;
 let currentPos = null;
-let transportMode = 'walking'; // Standard
+let transportMode = 'walking'; // Default
 let userMarker = null;
 let mapLoaded = false;
 let dataCache = {
@@ -10,9 +10,7 @@ let dataCache = {
     ulykke: null
 };
 
-// -------------------------------------------------------------
-// 1. OPPSETT AV KARTET (Den sikre metoden som virker for deg)
-// -------------------------------------------------------------
+// MAP SETUP
 const mapStyle = {
     'version': 8,
     'sources': {
@@ -43,23 +41,21 @@ try {
     });
     map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 } catch (err) {
-    console.error("Kartfeil:", err);
+    console.error("Map error:", err);
 }
 
-// -------------------------------------------------------------
-// 2. LASTING AV DATA
-// -------------------------------------------------------------
+// DATA LOADING
 map.on('load', async () => {
-    console.log("Kart lastet. Henter data...");
+    console.log("Map loaded. Fetching data...");
     mapLoaded = true;
 
-    // A. BOMBEROM (Må ha denne for å finne nærmeste tilfluktsrom)
+    // SHELTERS
     try {
         const res = await fetch('data/bomberom.geojson');
         if (res.ok) dataCache.bomberom = await res.json();
-    } catch (e) { console.warn("Mangler data/bomberom.geojson"); }
+    } catch (e) { console.warn("Missing data/bomberom.geojson"); }
 
-    // B. BRANNALARMSENTRALER
+    // FIRE ALARM CENTERS
     try {
         const res = await fetch('data/brannalarmsentraler.geojson');
         if (res.ok) {
@@ -75,7 +71,7 @@ map.on('load', async () => {
         }
     } catch (e) { console.warn(e); }
 
-    // C. TRAFIKKULYKKER
+    // TRAFFIC ACCIDENTS
     try {
         const res = await fetch('data/trafikkulykker.geojson');
         if (res.ok) {
@@ -91,7 +87,7 @@ map.on('load', async () => {
         }
     } catch (e) { console.warn(e); }
 
-    // D. WMS LAG (Gruppens)
+    // WMS LAYERS
     map.addSource('wms-tilfluktsrom', {
         type: 'raster',
         tiles: ['https://ogc.dsb.no/wms.ashx?service=WMS&version=1.3.0&request=GetMap&layers=layer_340&bbox={bbox-epsg-3857}&width=256&height=256&crs=EPSG:3857&transparent=true&format=image/png'],
@@ -106,7 +102,7 @@ map.on('load', async () => {
     });
     map.addLayer({ id: 'wms-brannvesen-layer', type: 'raster', source: 'wms-brannvesen', paint: {} });
 
-    // E. RUTE-LINJE
+    // ROUTE LINE
     map.addSource('route', {
         type: 'geojson',
         data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
@@ -122,31 +118,29 @@ map.on('load', async () => {
     setupControls();
 });
 
-// -------------------------------------------------------------
-// 3. INTERAKSJON (Popups)
-// -------------------------------------------------------------
+// INTERACTION
 map.on('click', 'brannalarmsentraler-layer', (e) => {
     const p = e.features[0].properties;
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${p.navn || 'Brannsentral'}</b><br>${p.lokalisering || ''}`).addTo(map);
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${p.navn || 'Fire Station'}</b><br>${p.lokalisering || ''}`).addTo(map);
 });
 map.on('click', 'trafikkulykker-layer', (e) => {
     const p = e.features[0].properties;
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Ulykke</b><br>${p.uhellskode || ''}`).addTo(map);
+    const date = p.ulykkesdato ? `<br>Date: ${p.ulykkesdato}` : '';
+    const weekday = p.ukedag ? ` (${p.ukedag})` : '';
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Accident</b>${date}${weekday}<br>${p.uhellskode || ''}`).addTo(map);
 });
 
-// -------------------------------------------------------------
-// 4. KNAPPER OG UI
-// -------------------------------------------------------------
+// BUTTONS AND UI
 function setupControls() {
-    // Finn meg
+    // Find me
     document.getElementById('btn-find-me').addEventListener('click', () => {
-        if (!navigator.geolocation) return alert("Ingen GPS støtte.");
+        if (!navigator.geolocation) return alert("No GPS support.");
         navigator.geolocation.getCurrentPosition(pos => {
             setUserLocation([pos.coords.longitude, pos.coords.latitude]);
-        }, () => alert("Fant ikke posisjon."));
+        }, () => alert("Could not find position."));
     });
 
-    // Søk
+    // Search
     const searchBtn = document.getElementById('btn-search');
     const searchInput = document.getElementById('search-input');
     
@@ -157,7 +151,7 @@ function setupControls() {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Norway&limit=1`);
             const data = await res.json();
             if (data.length > 0) setUserLocation([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
-            else alert("Fant ikke adressen.");
+            else alert("Address not found.");
         } catch (e) { console.error(e); }
     };
     
@@ -166,10 +160,10 @@ function setupControls() {
         if (e.key === 'Enter') performSearch();
     });
 
-    // Dropdown endring
+    // Dropdown change
     document.getElementById('target-category').addEventListener('change', () => { if (currentPos) calculateRoute(); });
 
-    // Transportmodus
+    // Transport mode
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -179,7 +173,7 @@ function setupControls() {
         });
     });
 
-    // Lag-kontroll
+    // Layer control
     const toggles = [
         { id: 'toggle-wms-tilfluktsrom', layer: 'wms-tilfluktsrom-layer' },
         { id: 'toggle-wms-brannvesen', layer: 'wms-brannvesen-layer' },
@@ -198,9 +192,7 @@ function setupControls() {
     });
 }
 
-// -------------------------------------------------------------
-// 5. RUTING (MED FIX FOR HTML ID-ER)
-// -------------------------------------------------------------
+// ROUTING
 
 function setUserLocation(coords) {
     currentPos = coords;
@@ -221,7 +213,7 @@ async function calculateRoute() {
     const targetData = dataCache[category];
 
     if (!targetData) {
-        if (category === 'bomberom') alert("Mangler data/bomberom.geojson");
+        if (category === 'bomberom') alert("Missing data/bomberom.geojson");
         return;
     }
 
@@ -232,7 +224,7 @@ async function calculateRoute() {
     const destCoords = nearest.geometry.coordinates;
     const props = nearest.properties;
 
-    // Server-valg (Walking vs Driving)
+    // Server choice (Walking vs Driving)
     let serviceUrl = 'https://router.project-osrm.org/route/v1';
     let profile = 'driving';
     if (transportMode === 'walking') {
@@ -249,26 +241,26 @@ async function calculateRoute() {
         if (json.routes && json.routes.length > 0) {
             const route = json.routes[0];
 
-            // Tegn linjen
+            // Draw the line
             map.getSource('route').setData(route.geometry);
 
-            // Zoom til ruten
+            // Zoom to route
             const bounds = new maplibregl.LngLatBounds();
             route.geometry.coordinates.forEach(c => bounds.extend(c));
             map.fitBounds(bounds, { padding: 50 });
 
             const min = Math.round(route.duration / 60);
             const km = (route.distance / 1000).toFixed(1);
-            const navn = props.adresse || props.navn || props.lokalisering || "Ukjent sted";
+            const navn = props.adresse || props.navn || props.lokalisering || "Unknown location";
 
-            // Vis resultatboksen
+            // Show result box
             document.getElementById('result-area').style.display = 'block';
 
-            // Oppdater tekst
+            // Update text
             document.getElementById('res-info').innerText = `${min} min  /  ${km} km`;
-            document.getElementById('res-dest').innerHTML = `Til: <b>${navn}</b>`;
+            document.getElementById('res-dest').innerHTML = `To: <b>${navn}</b>`;
         }
     } catch (err) {
-        console.error("Ruting feilet:", err);
+        console.error("Routing failed:", err);
     }
 }
