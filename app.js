@@ -7,7 +7,7 @@ const map = new maplibregl.Map({
 });
 
 map.on('load', () => {
-    // Add WMS source for tilfluktsrom
+    // Add WMS source for shelters
     map.addSource('wms-tilfluktsrom', {
         type: 'raster',
         tiles: [
@@ -16,7 +16,7 @@ map.on('load', () => {
         tileSize: 256
     });
 
-    // Add WMS layer for tilfluktsrom
+    // Add WMS layer for shelters
     map.addLayer({
         id: 'wms-tilfluktsrom-layer',
         type: 'raster',
@@ -24,7 +24,7 @@ map.on('load', () => {
         paint: {}
     });
 
-    // Add WMS source for brannvesen
+    // Add WMS source for fire services
     map.addSource('wms-brannvesen', {
         type: 'raster',
         tiles: [
@@ -33,7 +33,7 @@ map.on('load', () => {
         tileSize: 256
     });
 
-    // Add WMS layer for brannvesen
+    // Add WMS layer for fire services
     map.addLayer({
         id: 'wms-brannvesen-layer',
         type: 'raster',
@@ -41,13 +41,13 @@ map.on('load', () => {
         paint: {}
     });
 
-    // Add GeoJSON source and layer for brannalarmsentraler
+    // Add GeoJSON source and layer for fire alarm centers
     map.addSource('brannalarmsentraler', {
         type: 'geojson',
         data: 'data/brannalarmsentraler.geojson'
     });
 
-    // Add layer to visualize the brannalarmsentraler
+    // Add layer to visualize the fire alarm centers
     map.addLayer({
         id: 'brannalarmsentraler-layer',
         type: 'circle',
@@ -60,13 +60,13 @@ map.on('load', () => {
         }
     });
 
-    // Add GeoJSON source and layer for trafikkulykker
+    // Add GeoJSON source and layer for traffic accidents
     map.addSource('trafikkulykker', {
         type: 'geojson',
         data: 'data/trafikkulykker.geojson'
     });
 
-    // Add layer to visualize the trafikkulykker
+    // Add layer to visualize the traffic accidents
     map.addLayer({
         id: 'trafikkulykker-layer',
         type: 'circle',
@@ -79,7 +79,7 @@ map.on('load', () => {
         }
     });
 
-    // Add click event for brannalarmsentraler
+    // Add click event for fire alarm centers
     map.on('click', 'brannalarmsentraler-layer', (e) => {
         const coordinates = e.features[0].geometry.coordinates; // Point geometry
         const props = e.features[0].properties; // Get properties
@@ -95,7 +95,7 @@ map.on('load', () => {
             .addTo(map);
     });
     
-    // Add click event for trafikkulykker
+    // Add click event for traffic accidents
     map.on('click', 'trafikkulykker-layer', (e) => {
         const coordinates = e.features[0].geometry.coordinates; // Point geometry
         const props = e.features[0].properties;
