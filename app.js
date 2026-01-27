@@ -41,25 +41,6 @@ map.on('load', () => {
         paint: {}
     });
 
-    // Add GeoJSON source and layer for brannalarmsentraler
-    map.addSource('brannalarmsentraler', {
-        type: 'geojson',
-        data: 'data/brannalarmsentraler.geojson'
-    });
-
-    // Add layer to visualize the brannalarmsentraler
-    map.addLayer({
-        id: 'brannalarmsentraler-layer',
-        type: 'circle',
-        source: 'brannalarmsentraler',
-        paint: {
-            'circle-radius': 7,
-            'circle-color': '#0000FF',
-            'circle-stroke-width': 1,
-            'circle-stroke-color': '#FFFFFF'
-        }
-    });
-
     // Add GeoJSON source and layer for trafikkulykker
     map.addSource('trafikkulykker', {
         type: 'geojson',
@@ -79,22 +60,6 @@ map.on('load', () => {
         }
     });
 
-    // Add click event for brannalarmsentraler
-    map.on('click', 'brannalarmsentraler-layer', (e) => {
-        const coordinates = e.features[0].geometry.coordinates; // Point geometry
-        const props = e.features[0].properties; // Get properties
-
-        const description = `
-            <strong>Navn:</strong> ${props.navn || "Ukjent"}<br/> 
-            <strong>Sted:</strong> ${props.lokalisering || "Ukjent"}<br/>
-            `;
-        
-        new maplibregl.Popup()
-            .setLngLat(coordinates)
-            .setHTML(`<h3>Brannalarmsentral</h3><p>${description}</p>`)
-            .addTo(map);
-    });
-    
     // Add click event for trafikkulykker
     map.on('click', 'trafikkulykker-layer', (e) => {
         const coordinates = e.features[0].geometry.coordinates; // Point geometry
@@ -119,10 +84,6 @@ map.on('load', () => {
 
     document.getElementById('toggle-wms-brannvesen').addEventListener('change', (e) => {
         map.setLayoutProperty('wms-brannvesen-layer', 'visibility', e.target.checked ? 'visible' : 'none');
-    });
-
-    document.getElementById('toggle-brannalarmsentraler').addEventListener('change', (e) => {
-        map.setLayoutProperty('brannalarmsentraler-layer', 'visibility', e.target.checked ? 'visible' : 'none');
     });
 
     document.getElementById('toggle-trafikkulykker').addEventListener('change', (e) => {
