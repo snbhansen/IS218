@@ -583,9 +583,11 @@
             right: 24px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
+            /* Updated gap */
             z-index: 1000;
         }
+
 
         /* Group for Zoom Buttons */
         .zoom-group {
@@ -632,31 +634,111 @@
             width: 100%;
         }
 
-        /* Layers Button (Separate) */
-        #layer-btn {
+
+
+        /* GPS Button (Same style as Layer Button) */
+        .gps-btn {
             background: rgba(30, 41, 59, 0.85);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            width: 44px;
-            height: 44px;
             color: #f1f5f9;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            margin-bottom: 0px;
         }
 
-        #layer-btn:hover {
+        .gps-btn:hover {
             background: rgba(255, 255, 255, 0.15);
-            /* Slightly lighter on hover */
+        }
+
+        /* --- Filter Chips Row (Top) --- */
+        #filter-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+            pointer-events: auto;
+            /* Enable clicks */
+        }
+
+        .filter-chip {
+            background: rgba(15, 23, 42, 0.96);
+            /* Less transparent (more solid) */
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            /* Pill shape */
+            padding: 8px 16px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .filter-chip:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--text-color);
+        }
+
+        .filter-chip i {
+            font-size: 1rem;
         }
 
         /* Light Mode Overrides for Controls */
         [data-theme="light"] .zoom-group,
-        [data-theme="light"] #layer-btn {
-            background: rgba(255, 255, 255, 0.85);
-            border-color: rgba(0, 0, 0, 0.1);
+        [data-theme="light"] #layer-btn,
+        [data-theme="light"] .gps-btn,
+        [data-theme="light"] .filter-chip {
+            background: rgba(255, 255, 255, 0.95);
+            /* Nearly solid white in light mode */
+            border-color: rgba(0, 0, 0, 0.15);
+            color: #64748b;
+        }
+
+        [data-theme="light"] .filter-chip:hover {
+            background: rgba(0, 0, 0, 0.05);
             color: #0f172a;
         }
+
+        /* Active States with Glow (Placed AFTER light mode overrides to ensure they work) */
+        .filter-chip.active-green {
+            background: rgba(16, 185, 129, 0.9) !important;
+            /* High opacity */
+            border-color: rgba(16, 185, 129, 1) !important;
+            color: #ffffff !important;
+            /* White text for contrast on dark color */
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
+        }
+
+        .filter-chip.active-orange {
+            background: rgba(249, 115, 22, 0.9) !important;
+            border-color: rgba(249, 115, 22, 1) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.5) !important;
+        }
+
+        .filter-chip.active-red {
+            background: rgba(239, 68, 68, 0.9) !important;
+            border-color: rgba(239, 68, 68, 1) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5) !important;
+        }
+
+        .filter-chip.active-blue {
+            background: rgba(59, 130, 246, 0.9) !important;
+            border-color: rgba(59, 130, 246, 1) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5) !important;
+        }
+
+
 
         [data-theme="light"] .map-ctrl-btn {
             color: #0f172a;
