@@ -167,11 +167,25 @@ function setupControls() {
     // Finn meg
     document.getElementById('btn-find-me').addEventListener('click', () => {
         if (!navigator.geolocation) return alert("Ingen GPS støtte.");
+
         navigator.geolocation.getCurrentPosition(pos => {
             setUserLocation([pos.coords.longitude, pos.coords.latitude]);
         }, () => alert("Fant ikke posisjon."));
     });
 
+    // --- Global Overview (Zoom to Norway) ---
+    const btnGlobal = document.getElementById('btn-global-overview');
+    if (btnGlobal) {
+        btnGlobal.addEventListener('click', () => {
+            map.flyTo({
+                center: [15.0, 65.0], // Approx center of Norway (adjusted for better view)
+                zoom: 4,
+                speed: 0.8,
+                curve: 1,
+                essential: true
+            });
+        });
+    }
     // Søk
     document.getElementById('btn-search').addEventListener('click', async () => {
         const query = document.getElementById('search-input').value;
