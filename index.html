@@ -437,12 +437,22 @@
         }
 
         #result-area {
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(59, 130, 246, 0.1);
-            border-left: 3px solid var(--primary-color);
-            border-radius: 4px;
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 16px 24px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
             display: none;
+            z-index: 2500;
+            text-align: center;
+            color: #fff;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            min-width: 200px;
         }
 
         /* --- Global Top Search Bar (Command Center Style) --- */
