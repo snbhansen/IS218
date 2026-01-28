@@ -751,6 +751,100 @@
         [data-theme="light"] #btn-search {
             border-left-color: rgba(0, 0, 0, 0.05);
         }
+
+        /* --- Custom Map Controls (Floating) --- */
+        #custom-map-controls {
+            position: absolute;
+            bottom: 40px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        /* Group for Zoom Buttons */
+        .zoom-group {
+            display: flex;
+            flex-direction: column;
+            background: rgba(30, 41, 59, 0.85);
+            /* #1e293b with opacity */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Shared Button Styles */
+        .map-ctrl-btn {
+            width: 44px;
+            height: 44px;
+            border: none;
+            background: transparent;
+            color: #f1f5f9;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .map-ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .map-ctrl-btn:active {
+            transform: scale(0.95);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        /* Divider between zoom buttons */
+        .zoom-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 100%;
+        }
+
+        /* Layers Button (Separate) */
+        #layer-btn {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            width: 44px;
+            height: 44px;
+            color: #f1f5f9;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        #layer-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            /* Slightly lighter on hover */
+        }
+
+        /* Light Mode Overrides for Controls */
+        [data-theme="light"] .zoom-group,
+        [data-theme="light"] #layer-btn {
+            background: rgba(255, 255, 255, 0.85);
+            border-color: rgba(0, 0, 0, 0.1);
+            color: #0f172a;
+        }
+
+        [data-theme="light"] .map-ctrl-btn {
+            color: #0f172a;
+        }
+
+        [data-theme="light"] .zoom-divider {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .map-ctrl-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
 
@@ -775,6 +869,22 @@
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </div>
+    </div>
+
+    <!-- CUSTOM MAP CONTROLS -->
+    <div id="custom-map-controls">
+        <div class="zoom-group">
+            <button class="map-ctrl-btn" id="zoom-in-btn" title="Zoom Inn">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+            <div class="zoom-divider"></div>
+            <button class="map-ctrl-btn" id="zoom-out-btn" title="Zoom Ut">
+                <i class="fa-solid fa-minus"></i>
+            </button>
+        </div>
+        <button class="map-ctrl-btn" id="layer-btn" title="Lag">
+            <i class="fa-solid fa-layer-group"></i>
+        </button>
     </div>
 
     <!-- INTRO OVERLAY -->

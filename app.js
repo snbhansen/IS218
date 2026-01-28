@@ -40,7 +40,7 @@ try {
         center: [8.0182, 58.1467], // Kristiansand
         zoom: 12
     });
-    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+
 } catch (err) {
     console.error("Kartfeil:", err);
 }
@@ -149,6 +149,18 @@ map.on('click', 'trafikkulykker-layer', (e) => {
 // 4. KNAPPER OG UI
 // -------------------------------------------------------------
 function setupControls() {
+    // --- Custom Zoom Controls ---
+    document.getElementById('zoom-in-btn').addEventListener('click', () => map.zoomIn());
+    document.getElementById('zoom-out-btn').addEventListener('click', () => map.zoomOut());
+
+    // --- Custom Layer Button (Toggles Right Panel) ---
+    document.getElementById('layer-btn').addEventListener('click', () => {
+        const rightPanel = document.getElementById('ui-right');
+        if (rightPanel) {
+            rightPanel.classList.toggle('minimized');
+        }
+    });
+
     // Finn meg
     document.getElementById('btn-find-me').addEventListener('click', () => {
         if (!navigator.geolocation) return alert("Ingen GPS støtte.");
@@ -170,7 +182,10 @@ function setupControls() {
     });
 
     // Dropdown endring
-    document.getElementById('target-category').addEventListener('change', () => { if (currentPos) calculateRoute(); });
+    const targetCat = document.getElementById('target-category');
+    if (targetCat) {
+        targetCat.addEventListener('change', () => { if (currentPos) calculateRoute(); });
+    }
 
     // Transportmodus
     document.querySelectorAll('.mode-btn').forEach(btn => {
