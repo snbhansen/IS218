@@ -909,6 +909,12 @@
         [data-theme="light"] .nav-dot {
             border-color: #ffffff;
         }
+
+        [data-theme="light"] .nav-dot {
+            border-color: #ffffff;
+        }
+
+        /* End of Custom CSS */
     </style>
 </head>
 
@@ -991,6 +997,12 @@
 
     <div id="map"></div>
 
+    <!-- Route Result Overlay (Hidden Default) -->
+    <div id="result-area">
+        <div id="res-info" style="font-size: 1.2rem; font-weight: 700;"></div>
+        <div id="res-dest" style="font-size: 0.9rem; opacity: 0.8;"></div>
+    </div>
+
     <!-- NAVIGATION RAIL -->
     <nav id="nav-rail">
         <div class="nav-section top">
@@ -1000,21 +1012,39 @@
 
             <div id="nav-content-wrapper">
                 <div class="nav-spacer"></div>
-                <button class="nav-item" id="nav-overview" title="Oversikt">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
+                <!-- Functional Rail Items (Replaces Placeholders) -->
+
+
+                <button class="nav-item" id="nav-mode-toggle" title="Endre Transportmiddel (Gå)">
+                    <i class="fa-solid fa-person-walking"></i>
                 </button>
-                <button class="nav-item active-indicator" id="nav-incidents" title="Hendelser">
-                    <i class="fa-solid fa-bell"></i>
-                    <span class="nav-dot"></span>
+
+                <button class="nav-item" id="nav-find-shelter" title="Finn Tilfluktsrom">
+                    <i class="fa-solid fa-person-shelter"></i>
                 </button>
-                <button class="nav-item" id="nav-units" title="Enheter">
-                    <i class="fa-solid fa-user-shield"></i>
+                <button class="nav-item" id="nav-find-fire" title="Finn Brannstasjon">
+                    <i class="fa-solid fa-fire-extinguisher"></i>
                 </button>
-                <button class="nav-item" id="nav-saved" title="Lagret">
-                    <i class="fa-solid fa-bookmark"></i>
+                <button class="nav-item" id="nav-find-accident" title="Finn Ulykke">
+                    <i class="fa-solid fa-car-burst"></i>
                 </button>
-                <button class="nav-item" id="nav-categories" title="Kategorier">
-                    <i class="fa-solid fa-layer-group"></i>
+
+                <div class="nav-spacer"
+                    style="height: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); width: 40px; margin-bottom: 16px;">
+                </div>
+
+                <!-- System Tools -->
+                <button class="nav-item" id="nav-clear-route" title="Slett Rute">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+                <button class="nav-item" id="nav-reset-map" title="Nullstill Kart">
+                    <i class="fa-solid fa-compass"></i>
+                </button>
+                <button class="nav-item" id="nav-show-coords" title="Min Posisjon">
+                    <i class="fa-solid fa-location-dot"></i>
+                </button>
+                <button class="nav-item" id="nav-sys-status" title="Systemstatus">
+                    <i class="fa-solid fa-server"></i>
                 </button>
             </div>
         </div>
