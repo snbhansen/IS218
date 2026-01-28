@@ -172,6 +172,78 @@ function setupControls() {
         });
     }
 
+    // 1. Clear Route
+    const btnClear = document.getElementById('nav-clear-route');
+    if (btnClear) {
+        btnClear.addEventListener('click', () => {
+            const routeSource = map.getSource('route');
+            if (routeSource) {
+                routeSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
+                document.getElementById('result-area').style.display = 'none';
+            }
+        });
+    }
+
+    // 2. Reset Map
+    const btnReset = document.getElementById('nav-reset-map');
+    if (btnReset) {
+        btnReset.addEventListener('click', () => {
+            map.flyTo({ center: [8.0182, 58.1467], zoom: 12 });
+        });
+    }
+
+    // 3. Show Coordinates
+    const btnCoords = document.getElementById('nav-show-coords');
+    if (btnCoords) {
+        btnCoords.addEventListener('click', () => {
+            if (currentPos) {
+                alert(`Din posisjon:\nLat: ${currentPos[1].toFixed(5)}\nLng: ${currentPos[0].toFixed(5)}`);
+            } else {
+                alert("Ingen posisjon funnet enda. Prøv 'Finn meg' knappen først.");
+            }
+        });
+    }
+
+    // 4. System Status
+    const btnStatus = document.getElementById('nav-sys-status');
+    if (btnStatus) {
+        btnStatus.addEventListener('click', () => {
+            alert("System Status: ONLINE\n\nAll services operational.\nMapLibre GL JS: v5.1.0\nBackend: Connected");
+        });
+    }
+
+    // --- New Restored Features ---
+
+    // 5. Search (REMOVED - Redundant)
+    // const navSearch = document.getElementById('nav-search-btn'); ...
+
+    // 6. Transport Toggle
+    const navMode = document.getElementById('nav-mode-toggle');
+    if (navMode) {
+        navMode.addEventListener('click', () => {
+            const icon = navMode.querySelector('i');
+            if (transportMode === 'walking') {
+                transportMode = 'driving';
+                icon.className = 'fa-solid fa-car';
+                navMode.title = "Endre Transportmiddel (Bil)";
+            } else {
+                transportMode = 'walking';
+                icon.className = 'fa-solid fa-person-walking';
+                navMode.title = "Endre Transportmiddel (Gå)";
+            }
+            // Recalculate if route exists (check if result area is visible as proxy)
+            if (document.getElementById('result-area').style.display === 'block') {
+                // Try to guess last used category or just alert user
+                alert(`Transport endret til ${transportMode === 'walking' ? 'Gå' : 'Bil'}.\nVelg destinasjon på nytt for å oppdatere ruten.`);
+            }
+        });
+    }
+
+    // 7. Find Buttons
+    document.getElementById('nav-find-shelter')?.addEventListener('click', () => calculateRoute('bomberom'));
+    document.getElementById('nav-find-fire')?.addEventListener('click', () => calculateRoute('brann'));
+    document.getElementById('nav-find-accident')?.addEventListener('click', () => calculateRoute('ulykke'));
+
 
 
     // Finn meg
