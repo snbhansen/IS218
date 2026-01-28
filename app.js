@@ -163,7 +163,7 @@ function setupControls() {
     document.getElementById('zoom-in-btn').addEventListener('click', () => map.zoomIn());
     document.getElementById('zoom-out-btn').addEventListener('click', () => map.zoomOut());
 
-    // --- Navigation Rail Toggle ---
+    // --- Navigation Rail Logic ---
     const navRail = document.getElementById('nav-rail');
     const navToggleBtn = document.getElementById('nav-toggle-btn');
     if (navRail && navToggleBtn) {
