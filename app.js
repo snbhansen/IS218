@@ -153,13 +153,7 @@ function setupControls() {
     document.getElementById('zoom-in-btn').addEventListener('click', () => map.zoomIn());
     document.getElementById('zoom-out-btn').addEventListener('click', () => map.zoomOut());
 
-    // --- Custom Layer Button (Toggles Right Panel) ---
-    document.getElementById('layer-btn').addEventListener('click', () => {
-        const rightPanel = document.getElementById('ui-right');
-        if (rightPanel) {
-            rightPanel.classList.toggle('minimized');
-        }
-    });
+
 
     // Finn meg
     document.getElementById('btn-find-me').addEventListener('click', () => {
@@ -197,7 +191,7 @@ function setupControls() {
         });
     });
 
-    // Lag-kontroll
+    // Lag-kontroll (Definert her for å brukes av både checkboxer og chips)
     const toggles = [
         { id: 'toggle-wms-tilfluktsrom', layer: 'wms-tilfluktsrom-layer' },
         { id: 'toggle-wms-brannvesen', layer: 'wms-brannvesen-layer' },
@@ -205,14 +199,43 @@ function setupControls() {
         { id: 'toggle-brannalarmsentraler-outline', layer: 'brannalarmsentraler-outline' },
         { id: 'toggle-trafikkulykker', layer: 'trafikkulykker-layer' }
     ];
-    toggles.forEach(t => {
-        const el = document.getElementById(t.id);
-        if (el) {
-            el.addEventListener('change', (e) => {
-                if (map.getLayer(t.layer)) map.setLayoutProperty(t.layer, 'visibility', e.target.checked ? 'visible' : 'none');
+
+    // --- Filter Chips Interaksjon ---
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            const toggleId = btn.dataset.layer;
+            const activeClass = btn.dataset.activeClass;
+
+            // Finn konfigurasjon
+            // Merk: Brannalarmer har to lag (fill og outline), vi håndterer det ved å sjekke ID
+            // For enkelhets skyld, hvis det er brannalarmer, toggle begge
+
+            let targets = [toggles.find(t => t.id === toggleId)];
+
+            // Spesialhåndtering for brannalarmer som har to lag men en knapp
+            if (toggleId === 'toggle-brannalarmsentraler') {
+                const outline = toggles.find(t => t.id === 'toggle-brannalarmsentraler-outline');
+                if (outline) targets.push(outline);
+            }
+
+            // Toggle visuell state
+            const isActive = btn.classList.toggle(activeClass);
+
+            targets.forEach(target => {
+                if (!target) return;
+
+                // Toggle kart-lag
+                if (map.getLayer(target.layer)) {
+                    map.setLayoutProperty(target.layer, 'visibility', isActive ? 'visible' : 'none');
+                }
+
+
             });
-        }
+        });
     });
+
+
 }
 
 // -------------------------------------------------------------
