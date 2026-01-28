@@ -751,6 +751,154 @@
         [data-theme="light"] .map-ctrl-btn:hover {
             background: rgba(0, 0, 0, 0.05);
         }
+
+        /* --- Navigation Rail (Left) --- */
+        #nav-rail {
+            position: fixed;
+            top: 60px;
+            /* Below Header */
+            left: 0;
+            width: 80px;
+            /* Default Closed State Height: Just enough for the toggle button + padding */
+            height: 96px;
+            /* 24px top padding + 48px button + 24px bottom spacing (approx) */
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 0;
+            gap: 16px;
+            overflow: hidden;
+            /* Hide content when collapsed */
+            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Open State Class */
+        #nav-rail.nav-open {
+            height: calc(100vh - 60px);
+        }
+
+        .nav-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            width: 100%;
+        }
+
+        .nav-section.top {
+            flex: 1;
+            /* Pushes bottom section down */
+        }
+
+        /* Wrapper for hidden items */
+        #nav-content-wrapper,
+        #nav-bottom-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            width: 100%;
+            transition: opacity 0.2s ease, transform 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+        }
+
+        /* Reveal items when open */
+        #nav-rail.nav-open #nav-content-wrapper,
+        #nav-rail.nav-open #nav-bottom-wrapper {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+            transition-delay: 0.1s;
+            /* Slight delay for smooth effect */
+        }
+
+        /* Ensure Toggle Button is always visible and interactive */
+        #nav-toggle-btn {
+            z-index: 3005;
+        }
+
+        .nav-spacer {
+            height: 24px;
+        }
+
+        .nav-item {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #f1f5f9;
+        }
+
+        .nav-item.active-indicator {
+            color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* Access active state via class */
+        .nav-item.active {
+            color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.15);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Notification Dot */
+        .nav-dot {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            /* Red */
+            border-radius: 50%;
+            border: 1px solid rgba(15, 23, 42, 0.9);
+            box-shadow: 0 0 5px rgba(239, 68, 68, 0.6);
+        }
+
+        /* Light Mode Overrides for Rail */
+        [data-theme="light"] #nav-rail {
+            background: rgba(255, 255, 255, 0.95);
+            border-right-color: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .nav-item {
+            color: #64748b;
+        }
+
+        [data-theme="light"] .nav-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: #0f172a;
+        }
+
+        [data-theme="light"] .nav-item.active-indicator,
+        [data-theme="light"] .nav-item.active {
+            color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        [data-theme="light"] .nav-dot {
+            border-color: #ffffff;
+        }
     </style>
 </head>
 
