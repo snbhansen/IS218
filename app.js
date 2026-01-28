@@ -359,10 +359,21 @@ function setUserLocation(coords) {
     calculateRoute();
 }
 
-async function calculateRoute() {
-    if (!currentPos) return;
+async function calculateRoute(targetCategory) {
+    if (!currentPos) {
+        alert("Du må finne din posisjon først!");
+        return;
+    }
 
-    const category = document.getElementById('target-category').value;
+    // Default: Bruk dropdown HVIS den finnes, ellers bruk argumentet
+    let category = targetCategory;
+    const dropDown = document.getElementById('target-category');
+    if (!category && dropDown) {
+        category = dropDown.value;
+    }
+
+    if (!category) return; // Ingen kategori valgt
+
     const targetData = dataCache[category];
 
     if (!targetData) {
