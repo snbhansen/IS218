@@ -290,4 +290,35 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("System started.");
         });
     }
+
+    // --- TEMAVELGER LOGIKK ---
+    const themeSwitch = document.getElementById('theme-switch');
+    const icon = themeSwitch ? themeSwitch.querySelector('i') : null;
+    const body = document.body;
+    const html = document.documentElement;
+
+    // Sjekk lagret tema
+    const savedTheme = localStorage.getItem('theme') || 'dark'; // Dark default
+    if (savedTheme === 'light') {
+        html.setAttribute('data-theme', 'light');
+        if (icon) icon.className = 'fa-solid fa-sun';
+    } else {
+        html.removeAttribute('data-theme'); // Standard variabler er dark
+        if (icon) icon.className = 'fa-solid fa-moon';
+    }
+
+    if (themeSwitch) {
+        themeSwitch.addEventListener('click', () => {
+            const current = html.getAttribute('data-theme');
+            if (current === 'light') {
+                html.removeAttribute('data-theme'); // Bytt til dark
+                localStorage.setItem('theme', 'dark');
+                if (icon) icon.className = 'fa-solid fa-moon';
+            } else {
+                html.setAttribute('data-theme', 'light'); // Bytt til light
+                localStorage.setItem('theme', 'light');
+                if (icon) icon.className = 'fa-solid fa-sun';
+            }
+        });
+    }
 });
