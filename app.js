@@ -394,6 +394,7 @@ async function calculateRoute(targetCategory) {
         serviceUrl = 'https://routing.openstreetmap.de/routed-foot/route/v1';
     }
 
+    // OSRM expects: lon,lat;lon,lat
     const url = `${serviceUrl}/driving/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`;
 
     try {
@@ -411,18 +412,17 @@ async function calculateRoute(targetCategory) {
             route.geometry.coordinates.forEach(c => bounds.extend(c));
             map.fitBounds(bounds, { padding: 50 });
 
-            // --- HER ER FIKSEN FOR TEKSTEN ---
-            // Vi matcher ID-ene fra HTML-koden din: 'res-info', 'res-dest' og 'result-area'
+            // --- Vis Resultat ---
             const min = Math.round(route.duration / 60);
             const km = (route.distance / 1000).toFixed(1);
             const navn = props.adresse || props.navn || props.lokalisering || "Ukjent sted";
 
-            // Vis resultatboksen
-            document.getElementById('result-area').style.display = 'block';
-
-            // Oppdater tekst (Dette var feil i forrige versjon)
-            document.getElementById('res-info').innerText = `${min} min  /  ${km} km`;
-            document.getElementById('res-dest').innerHTML = `Til: <b>${navn}</b>`;
+            const resultArea = document.getElementById('result-area');
+            if (resultArea) {
+                resultArea.style.display = 'block';
+                document.getElementById('res-info').innerText = `${min} min  /  ${km} km  (${transportMode === 'walking' ? 'Gå' : 'Bil'})`;
+                document.getElementById('res-dest').innerHTML = `Til: <b>${navn}</b>`;
+            }
         }
     } catch (err) {
         console.error("Ruting feilet:", err);
