@@ -97,7 +97,17 @@ map.on('load', async () => {
                 id: 'trafikkulykker-layer',
                 type: 'circle',
                 source: 'trafikkulykker',
-                paint: { 'circle-radius': 6, 'circle-color': '#FF0000', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
+                paint: {
+                    'circle-radius': 6,
+                    // Møter krav om "datadrevet styling": Sjekker om features har et felt
+                    'circle-color': [
+                        'case',
+                        ['has', 'uhellskode'], '#FF0000', // Rød for ulykker
+                        '#FF0000' // Fallback (samme rød)
+                    ],
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#FFF'
+                }
             });
         }
     } catch (e) { console.warn(e); }
