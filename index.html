@@ -775,10 +775,34 @@
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </div>
+
+        <!-- Filter Chips Row -->
+        <div id="filter-row">
+            <button class="filter-chip active-green" id="chip-tilfluktsrom" data-layer="toggle-wms-tilfluktsrom"
+                data-active-class="active-green">
+                <i class="fa-solid fa-person-shelter"></i> Tilfluktsrom
+            </button>
+            <button class="filter-chip active-orange" id="chip-brann" data-layer="toggle-brannalarmsentraler"
+                data-active-class="active-orange">
+                <i class="fa-solid fa-fire-burner"></i> Brannalarmer
+            </button>
+            <button class="filter-chip active-red" id="chip-trafikk" data-layer="toggle-trafikkulykker"
+                data-active-class="active-red">
+                <i class="fa-solid fa-car-burst"></i> Trafikk
+            </button>
+            <button class="filter-chip active-blue" id="chip-brannvesen" data-layer="toggle-wms-brannvesen"
+                data-active-class="active-blue">
+                <i class="fa-solid fa-building-shield"></i> Brannvesen
+            </button>
+        </div>
     </div>
 
     <!-- CUSTOM MAP CONTROLS -->
     <div id="custom-map-controls">
+        <button class="map-ctrl-btn gps-btn" id="btn-find-me" title="Finn min posisjon">
+            <i class="fa-solid fa-crosshairs"></i>
+        </button>
+
         <div class="zoom-group">
             <button class="map-ctrl-btn" id="zoom-in-btn" title="Zoom Inn">
                 <i class="fa-solid fa-plus"></i>
