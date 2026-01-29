@@ -186,7 +186,6 @@ function setupControls() {
 
     // Layer control
     const toggles = [
-        { id: 'toggle-wms-brannvesen', layer: 'wms-brannvesen-layer' },
         { id: 'toggle-brannalarmsentraler', layer: 'brannalarmsentraler-layer' },
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
         { id: 'toggle-trafikkulykker', layer: 'trafikkulykker-layer' }
