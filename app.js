@@ -49,26 +49,9 @@ map.on('load', async () => {
     console.log("Map loaded. Fetching data...");
     mapLoaded = true;
 
-    // Create yellow square icon with T
-    const canvas = document.createElement('canvas');
-    canvas.width = 40;
-    canvas.height = 40;
-    const ctx = canvas.getContext('2d');
-    
-    ctx.fillStyle = '#FFD700';
-    ctx.fillRect(2, 2, 36, 36);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(2, 2, 36, 36);
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('T', 20, 20);
-    
-    map.addImage('tilfluktsrom-icon', ctx.getImageData(0, 0, 40, 40));
+    await loadTilfluktsromIcon(map);
 
-    // SHELTERS - tilfluktsrom.geojson
+    // SHELTERS
     try {
         const res = await fetch('data/tilfluktsrom.geojson');
         if (res.ok) {
@@ -81,15 +64,9 @@ map.on('load', async () => {
                 source: 'tilfluktsrom-source',
                 layout: {
                     'icon-image': 'tilfluktsrom-icon',
-                    'icon-size': 1,
-                    'text-field': 'T',
-                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                    'text-size': 14,
-                    'text-offset': [0, 0],
-                    'text-anchor': 'center'
-                },
-                paint: {
-                    'text-color': '#000000'
+                    'icon-size': 0.2,
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true
                 }
             });
         }
@@ -160,7 +137,8 @@ map.on('click', 'tilfluktsrom-layer', (e) => {
     const p = e.features[0].properties;
     const plasser = p.plasser ? `<br><b>Capacity:</b> ${p.plasser} people` : '';
     const romnr = p.romnr ? `<br><b>Room:</b> ${p.romnr}` : '';
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Shelter</b><br><b>Address:</b> ${p.adresse || 'N/A'}${romnr}${plasser}`).addTo(map);
+    const adresse = p.adresse ? `<br><b>Address:</b> ${p.adresse}` : '';
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Shelter</b>${adresse}${romnr}${plasser}`).addTo(map);
 });
 
 // BUTTONS AND UI
@@ -296,4 +274,23 @@ async function calculateRoute() {
     } catch (err) {
         console.error("Routing failed:", err);
     }
+}
+
+function loadTilfluktsromIcon(mapInstance) {
+    if (mapInstance.hasImage('tilfluktsrom-icon')) return Promise.resolve();
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+        <rect x="2" y="2" width="28" height="28" fill="#FFD700" stroke="#000" stroke-width="2"/>
+        <text x="16" y="22" font-size="18" font-weight="700" text-anchor="middle" fill="#000">T</text>
+    </svg>`;
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            if (!mapInstance.hasImage('tilfluktsrom-icon')) {
+                mapInstance.addImage('tilfluktsrom-icon', img, { pixelRatio: 2 });
+            }
+            resolve();
+        };
+        img.onerror = reject;
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    });
 }
