@@ -6,7 +6,6 @@ let userMarker = null;
 let mapLoaded = false;
 let dataCache = {
     tilfluktsrom: null,
-    brann: null,
     ulykke: null
 };
 
@@ -72,22 +71,6 @@ map.on('load', async () => {
         }
     } catch (e) { console.warn("Missing data/tilfluktsrom.geojson", e); }
 
-    // FIRE ALARM CENTERS
-    try {
-        const res = await fetch('data/brannalarmsentraler.geojson');
-        if (res.ok) {
-            const json = await res.json();
-            dataCache.brann = json;
-            map.addSource('brannalarmsentraler', { type: 'geojson', data: json });
-            map.addLayer({
-                id: 'brannalarmsentraler-layer',
-                type: 'circle',
-                source: 'brannalarmsentraler',
-                paint: { 'circle-radius': 6, 'circle-color': '#0000FF', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
-            });
-        }
-    } catch (e) { console.warn(e); }
-
     // TRAFFIC ACCIDENTS
     try {
         const res = await fetch('data/trafikkulykker.geojson');
@@ -121,11 +104,6 @@ map.on('load', async () => {
 });
 
 // INTERACTION - Register click handlers
-map.on('click', 'brannalarmsentraler-layer', (e) => {
-    const p = e.features[0].properties;
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${p.navn || 'Fire Station'}</b><br>${p.lokalisering || ''}`).addTo(map);
-});
-
 map.on('click', 'trafikkulykker-layer', (e) => {
     const p = e.features[0].properties;
     const date = p.ulykkesdato ? `<br>Date: ${p.ulykkesdato}` : '';
@@ -186,8 +164,6 @@ function setupControls() {
 
     // Layer control
     const toggles = [
-        { id: 'toggle-wms-brannvesen', layer: 'wms-brannvesen-layer' },
-        { id: 'toggle-brannalarmsentraler', layer: 'brannalarmsentraler-layer' },
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
         { id: 'toggle-trafikkulykker', layer: 'trafikkulykker-layer' }
     ];
