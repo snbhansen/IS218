@@ -48,7 +48,11 @@ map.on('load', async () => {
     console.log("Map loaded. Fetching data...");
     mapLoaded = true;
 
-    await loadTilfluktsromIcon(map);
+    try {
+        await loadTilfluktsromIcon(map);
+    } catch (e) {
+        console.error("Failed to load tilfluktsrom icon", e);
+    }
 
     // SHELTERS
     try {
