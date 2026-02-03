@@ -94,17 +94,17 @@ map.on('load', async () => {
         }
     } catch (e) { console.warn("Missing data/tilfluktsrom.geojson", e); }
 
-    // TRAFFIC ACCIDENTS
+    // FIRE STATIONS
     try {
-        const res = await fetch('data/trafikkulykker.geojson');
+        const res = await fetch('data/brannstasjoner.geojson');
         if (res.ok) {
             const json = await res.json();
             dataCache.ulykke = json;
-            map.addSource('trafikkulykker', { type: 'geojson', data: json });
+            map.addSource('brannstasjoner', { type: 'geojson', data: json });
             map.addLayer({
-                id: 'trafikkulykker-layer',
+                id: 'brannstasjoner-layer',
                 type: 'circle',
-                source: 'trafikkulykker',
+                source: 'brannstasjoner',
                 paint: { 'circle-radius': 6, 'circle-color': '#ef4444', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
             });
         }
@@ -127,12 +127,7 @@ map.on('load', async () => {
 });
 
 // INTERACTION - Register click handlers
-map.on('click', 'trafikkulykker-layer', (e) => {
-    const p = e.features[0].properties;
-    const date = p.ulykkesdato ? `<br>Date: ${p.ulykkesdato}` : '';
-    const weekday = p.ukedag ? ` (${p.ukedag})` : '';
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Accident</b>${date}${weekday}<br>${p.uhellskode || ''}`).addTo(map);
-});
+
 
 map.on('click', 'tilfluktsrom-layer', (e) => {
     const p = e.features[0].properties;
@@ -140,6 +135,13 @@ map.on('click', 'tilfluktsrom-layer', (e) => {
     const romnr = p.romnr ? `<br><b>Room:</b> ${p.romnr}` : '';
     const adresse = p.adresse ? `<br><b>Address:</b> ${p.adresse}` : '';
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Shelter</b>${adresse}${romnr}${plasser}`).addTo(map);
+});
+
+map.on('click', 'brannstasjoner-layer', (e) => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`
+        <b>Brannstasjon: </b>${p.brannstasjon || 'Brannstasjon'}<br>
+        <b>Brannvesen:</b> ${p.brannvesen || 'Brannvesen'}`).addTo(map);
 });
 
 // BUTTONS AND UI
@@ -188,7 +190,7 @@ function setupControls() {
     // Layer control
     const toggles = [
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
-        { id: 'toggle-trafikkulykker', layer: 'trafikkulykker-layer' }
+        { id: 'toggle-brannstasjoner', layer: 'brannstasjoner-layer' }
     ];
     toggles.forEach(t => {
         const el = document.getElementById(t.id);
