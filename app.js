@@ -204,7 +204,15 @@ async function calculateRoute() {
     const targetData = dataCache[category];
 
     if (!targetData) {
-        if (category === 'tilfluktsrom') alert("Missing data/tilfluktsrom.geojson");
+        let msg;
+        if (category === 'tilfluktsrom') {
+            msg = "Missing data/tilfluktsrom.geojson";
+        } else if (category === 'ulykke') {
+            msg = "Missing data for 'ulykke' (accidents).";
+        } else {
+            msg = "Missing data for the selected category.";
+        }
+        alert(msg);
         return;
     }
 
