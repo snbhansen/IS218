@@ -48,10 +48,12 @@ map.on('load', async () => {
     console.log("Map loaded. Fetching data...");
     mapLoaded = true;
 
+    let iconLoaded = false;
     try {
         await loadTilfluktsromIcon(map);
+        iconLoaded = true;
     } catch (e) {
-        console.error("Failed to load tilfluktsrom icon", e);
+        console.error("Failed to load tilfluktsrom icon, will use fallback circle markers", e);
     }
 
     // SHELTERS
@@ -61,17 +63,34 @@ map.on('load', async () => {
             const json = await res.json();
             dataCache.tilfluktsrom = json;
             map.addSource('tilfluktsrom-source', { type: 'geojson', data: json });
-            map.addLayer({
-                id: 'tilfluktsrom-layer',
-                type: 'symbol',
-                source: 'tilfluktsrom-source',
-                layout: {
-                    'icon-image': 'tilfluktsrom-icon',
-                    'icon-size': 0.2,
-                    'icon-allow-overlap': true,
-                    'icon-ignore-placement': true
-                }
-            });
+            
+            if (iconLoaded) {
+                // Use icon symbol if available
+                map.addLayer({
+                    id: 'tilfluktsrom-layer',
+                    type: 'symbol',
+                    source: 'tilfluktsrom-source',
+                    layout: {
+                        'icon-image': 'tilfluktsrom-icon',
+                        'icon-size': 0.2,
+                        'icon-allow-overlap': true,
+                        'icon-ignore-placement': true
+                    }
+                });
+            } else {
+                // Fallback to circle markers if icon loading failed
+                map.addLayer({
+                    id: 'tilfluktsrom-layer',
+                    type: 'circle',
+                    source: 'tilfluktsrom-source',
+                    paint: {
+                        'circle-radius': 8,
+                        'circle-color': '#FFD700',
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#000'
+                    }
+                });
+            }
         }
     } catch (e) { console.warn("Missing data/tilfluktsrom.geojson", e); }
 
