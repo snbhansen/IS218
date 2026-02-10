@@ -170,7 +170,9 @@ map.on('click', 'tilfluktsrom-layer', (e) => {
 
 map.on('click', 'brannstasjoner-layer', (e) => {
     const p = e.features[0].properties;
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${p.brannstasjon || 'Brannstasjon'}</b>`).addTo(map);
+    const brannstasjon = p.brannstasjon ? `<br><b>Location:</b> ${p.brannstasjon}` : '';
+    const brannvesen = p.brannvesen ? `<br><b>Fire Deptartment:</b> ${p.brannvesen}` : ''; 
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Fire Station</b>${brannstasjon}${brannvesen}`).addTo(map);
 });
 
 // UI CONTROLS
