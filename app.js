@@ -11,7 +11,8 @@ let userMarker = null;
 let mapLoaded = false;
 let dataCache = {
     tilfluktsrom: null,
-    brannstasjoner: null
+    brannstasjoner: null,
+    sykehus: null
 };
 
 // --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
@@ -62,11 +63,22 @@ async function fetchGeoJSON(tableName) {
 
         const { location, ...properties } = row;
 
+        if (row.location && row.location.type) {
+            const point = turf.pointOnFeature(row.location);
+
+            return {
+                type: 'Feature',
+                geometry: point.geometry,
+                properties: properties  
+            }
+        }
+
         return {
             type: 'Feature',
             geometry: { type: 'Point', coordinates: coords },
             properties: properties
         };
+
     }).filter(f => f !== null);
 
     console.log(`Ferdig behandlet ${features.length} punkter for ${tableName}.`);
@@ -147,7 +159,49 @@ map.on('load', async () => {
         });
     }
 
-    // 3. Rute-lag (tomt foreløpig)
+    // 3. Hent Sykehuser
+   // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
+    async function fetchHospitals() {
+    console.log("Henter data fra sykehus...");
+    const { data, error } = await supabaseClient
+        .from('sykehus')
+        .select('name, phone, WKT');
+
+    if (error) {
+        console.error("Feil fra Supabase (sykehus):", error);
+        return null;
+    }
+
+    const features = data.map(row => {
+        if (!row.WKT || row.WKT.type !== 'Point') return null;
+
+        return {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: row.WKT.coordinates },
+            properties: { 
+                name: row.name,
+                phone: row.phone || null
+            }
+        };
+    }).filter(f => f !== null);
+
+    console.log(`Ferdig behandlet ${features.length} sykehus-punkter.`);
+    return { type: 'FeatureCollection', features };
+}
+ const hospitals = await fetchHospitals();
+
+    if (hospitals) {
+        dataCache.sykehus = hospitals;
+        map.addSource('sykehus', { type: 'geojson', data: hospitals });
+        map.addLayer({
+            id: 'sykehus-layer',
+            type: 'circle',
+            source: 'sykehus',
+            paint: { 'circle-radius': 6, 'circle-color': '#10b981', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
+        });
+    }
+
+    // 4. Rute-lag (tomt foreløpig)
     map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
     map.addLayer({
         id: 'route-layer',
@@ -165,14 +219,21 @@ map.on('click', 'tilfluktsrom-layer', (e) => {
     const p = e.features[0].properties;
     const plasser = p.plasser ? `<br><b>Capacity:</b> ${p.plasser}` : '';
     const adresse = p.adresse ? `<br><b>Address:</b> ${p.adresse}` : '';
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Shelter</b>${adresse}${plasser}`).addTo(map);
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>SHELTER</b>${adresse}${plasser}`).addTo(map);
 });
 
 map.on('click', 'brannstasjoner-layer', (e) => {
     const p = e.features[0].properties;
     const brannstasjon = p.brannstasjon ? `<br><b>Location:</b> ${p.brannstasjon}` : '';
     const brannvesen = p.brannvesen ? `<br><b>Fire Deptartment:</b> ${p.brannvesen}` : ''; 
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>Fire Station</b>${brannstasjon}${brannvesen}`).addTo(map);
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>FIRE STATION</b>${brannstasjon}${brannvesen}`).addTo(map);
+});
+
+map.on('click', 'sykehus-layer', (e) => {
+    const p = e.features[0].properties;
+    const name = p.name ? `<br><b>Name:</b> ${p.name}` : '';
+    const phone = p.phone ? `<br><b>Phone:</b> ${p.phone}` : '';
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>HOSPITAL</b>${name}${phone}`).addTo(map);
 });
 
 // UI CONTROLS
@@ -216,7 +277,8 @@ function setupControls() {
     // Layer Checkboxes
     const toggles = [
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
-        { id: 'toggle-brannstasjoner', layer: 'brannstasjoner-layer' }
+        { id: 'toggle-brannstasjoner', layer: 'brannstasjoner-layer' },
+        { id: 'toggle-sykehus', layer: 'sykehus-layer' }
     ];
     toggles.forEach(t => {
         const el = document.getElementById(t.id);
