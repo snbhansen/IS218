@@ -1,6 +1,6 @@
 // --- SUPABASE CONFIGURATION ---
 const SUPABASE_URL = 'https://wqfpqpvdicvejbvnplcf.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxZnBxcHZkaWN2ZWpidm5wbGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMDMyMzEsImV4cCI6MjA4NTc3OTIzMX0.S7Hl1YuOmzN6VpZTUnHus1PGUNb8r7bWGdcDdubys9o';
+const SUPABASE_KEY = 'sb_publishable_c9St0FCq1CXFQr5C1Ba3Hg_xGovKgNN';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // GLOBAL VARIABLES
@@ -199,13 +199,13 @@ map.on('load', async () => {
         });
     }
 
-    // 3.5 Fetch Drinking Water from Supabase - mixed geometries (polygons + points)
+    // 3.5 Fetch Drinking Water from Supabase
     try {
         console.log("Fetching drinking water from Supabase table: drikkevann_geojson...");
         
         const { data, error } = await supabaseClient
             .from('drikkevann_geojson')
-            .select('*');
+            .select('id, name, geom');
 
         if (error) {
             console.error("Error from Supabase (drikkevann_geojson):", error);
@@ -214,8 +214,8 @@ map.on('load', async () => {
 
         console.log(`Fetched ${data?.length || 0} rows from drikkevann_geojson table.`);
 
-        // Build GeoJSON FeatureCollection
-        const drinkingWaterGeoJson = {
+        // Build GeoJSON FeatureCollection for polygons
+        const drikkevannPolygons = {
             type: 'FeatureCollection',
             features: (data || []).map(row => {
                 if (!row.geom) return null;
@@ -230,11 +230,11 @@ map.on('load', async () => {
             }).filter(f => f !== null)
         };
 
-        console.log(`Built FeatureCollection with ${drinkingWaterGeoJson.features.length} features.`);
+        console.log(`Built FeatureCollection with ${drikkevannPolygons.features.length} features.`);
 
         // Log geometry types for verification
         const geomTypes = { Polygon: 0, MultiPolygon: 0, Point: 0, other: 0 };
-        drinkingWaterGeoJson.features.forEach(f => {
+        drikkevannPolygons.features.forEach(f => {
             const type = f.geometry?.type;
             if (type === 'Polygon') geomTypes.Polygon++;
             else if (type === 'MultiPolygon') geomTypes.MultiPolygon++;
@@ -243,49 +243,59 @@ map.on('load', async () => {
         });
         console.log('Drinking water geometry type counts:', geomTypes);
 
-        if (drinkingWaterGeoJson.features.length > 0) {
-            const firstGeomType = drinkingWaterGeoJson.features[0].geometry?.type;
+        if (drikkevannPolygons.features.length > 0) {
+            const firstGeomType = drikkevannPolygons.features[0].geometry?.type;
             console.log(`First feature geometry type: ${firstGeomType}`);
         }
 
-        if (geomTypes.Polygon + geomTypes.MultiPolygon + geomTypes.Point === 0) {
-            console.error('Drinking water GeoJSON contains no valid geometries');
-        }
-
         // Add polygon source and layers
-        map.addSource('drikkevann-polygons', { type: 'geojson', data: drinkingWaterGeoJson });
+        map.addSource('drikkevann-polygons', { type: 'geojson', data: drikkevannPolygons });
+
+        map.addLayer({id: 'drikkevann-centroid', type: 'circle', source: 'drikkevann-polygons', maxzoom: 13,
+            paint: {
+                    'circle-radius': 5,
+                    'circle-color': '#2563eb',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#fff'
+                    }
+                    });
+        
         map.addLayer({
             id: 'drikkevann-fill',
             type: 'fill',
             source: 'drikkevann-polygons',
+            minzoom: 14,
             paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.6 }
         });
+        
         map.addLayer({
             id: 'drikkevann-outline',
             type: 'line',
+            minzoom: 14,
             source: 'drikkevann-polygons',
             paint: { 'line-color': '#1e40af', 'line-width': 3 }
         });
 
-        // Create point FeatureCollection for nearest/routing logic (not added to map)
-        const drinkingWaterPoints = {
+        // Create point FeatureCollection for routing using turf.pointOnFeature
+        const drikkevannPoints = {
             type: 'FeatureCollection',
-            features: drinkingWaterGeoJson.features.map(f => {
-                const point = turf.pointOnFeature(f);
+            features: drikkevannPolygons.features.map(feature => {
+                const point = turf.pointOnFeature(feature);
                 return {
                     type: 'Feature',
                     geometry: point.geometry,
-                    properties: { ...(f.properties || {}) }
+                    properties: { ...feature.properties }
                 };
             })
         };
 
-        console.log(`Processed ${drinkingWaterPoints.features.length} drinking water points for routing.`);
-        dataCache.drikkevann = drinkingWaterPoints;
+        console.log(`Processed ${drikkevannPoints.features.length} drinking water points for routing.`);
+        dataCache.drikkevann = drikkevannPoints;
 
     } catch (e) {
         console.error("Error loading drinking water data from Supabase:", e);
     }
+
 
     // 4. Route layer (empty initially)
     map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
@@ -371,7 +381,7 @@ function setupControls() {
         { id: 'toggle-tilfluktsrom', layers: ['tilfluktsrom-layer'] },
         { id: 'toggle-brannstasjoner', layers: ['brannstasjoner-layer'] },
         { id: 'toggle-sykehus', layers: ['sykehus-layer'] },
-        { id: 'toggle-drikkevann', layers: ['drikkevann-fill', 'drikkevann-outline'] }
+        { id: 'toggle-drikkevann', layers: ['drikkevann-centroid', 'drikkevann-fill', 'drikkevann-outline'] }
     ];
     toggles.forEach(t => {
         const el = document.getElementById(t.id);
