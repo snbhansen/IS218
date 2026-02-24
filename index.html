@@ -69,10 +69,11 @@
             <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
             <label for="target-category" style="font-size: 0.9em; font-weight: bold;">What are you looking for?</label>
-            <select id="target-category">
-                <option value="tilfluktsrom">Nearest Shelter</option>
+            <select id="target-category">          
+                <option value="drikkevann">Nearest Drinking Water</option>    
                 <option value="brannstasjoner">Nearest Fire Station</option>
                 <option value="sykehus">Nearest Hospital</option>
+                <option value="tilfluktsrom">Nearest Shelter</option>
             </select>
 
             <div class="transport-toggles">
@@ -89,9 +90,10 @@
 
         <div class="panel-box" id="layer-control">
             <h3>View (Layers)</h3>
-            <label><input type="checkbox" id="toggle-tilfluktsrom" checked /> Shelters</label>
+            <label><input type="checkbox" id="toggle-drikkevann" checked /> Drinking Water</label>
             <label><input type="checkbox" id="toggle-brannstasjoner" checked /> Fire Stations</label>
             <label><input type="checkbox" id="toggle-sykehus" checked /> Hospitals</label>
+            <label><input type="checkbox" id="toggle-tilfluktsrom" checked /> Shelters</label>
         </div>
     </div>
 

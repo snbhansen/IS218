@@ -12,6 +12,7 @@ let mapLoaded = false;
 let dataCache = {
     tilfluktsrom: null,
     brannstasjoner: null,
+    drikkevann: null,
     sykehus: null
 };
 
@@ -159,7 +160,20 @@ map.on('load', async () => {
         });
     }
 
-    // 3. Hent Sykehuser
+    // 3. Hent Drikkevann 
+    const drinkingWater = await fetchGeoJSON('drikkevann');
+    if (drinkingWater) {
+        dataCache.drikkevann = drinkingWater;
+        map.addSource('drikkevann-source', { type: 'geojson', data: drinkingWater });
+        map.addLayer({
+            id: 'drikkevann-layer',
+            type: 'circle',
+            source: 'drikkevann-source',
+            paint: { 'circle-radius': 6, 'circle-color': '#3b82f6', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFF' }
+        });
+    }
+
+    // 4. Hent Sykehuser
    // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
     async function fetchHospitals() {
     console.log("Henter data fra sykehus...");
@@ -229,6 +243,16 @@ map.on('click', 'brannstasjoner-layer', (e) => {
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>FIRE STATION</b>${brannstasjon}${brannvesen}`).addTo(map);
 });
 
+map.on('click', 'drikkevann-layer', (e) => {
+    const p = e.features[0].properties;
+    const navn = p.name ? `<br><b>Name:</b> ${p.name}` : '';
+    const description = p.description ? `<br><b>Description:</b> ${p.description}` : '';
+    const operator = p.operator ? `<br><b>Operator:</b> ${p.operator}` : '';
+    const hours= p.opening_hours ? `<br><b>Hours:</b> ${p.opening_hours}` : '';
+    const wheelchair = p.wheelchair ? `<br><b>Wheelchair Access:</b> ${p.wheelchair}` : '';
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>DRINKING WATER</b>${navn}${description}${operator}${hours}${wheelchair}`).addTo(map);
+});
+
 map.on('click', 'sykehus-layer', (e) => {
     const p = e.features[0].properties;
     const name = p.name ? `<br><b>Name:</b> ${p.name}` : '';
@@ -278,6 +302,7 @@ function setupControls() {
     const toggles = [
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
         { id: 'toggle-brannstasjoner', layer: 'brannstasjoner-layer' },
+        { id: 'toggle-drikkevann', layer: 'drikkevann-layer' },
         { id: 'toggle-sykehus', layer: 'sykehus-layer' }
     ];
     toggles.forEach(t => {
