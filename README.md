@@ -107,3 +107,4 @@ GPS/Adresse → Turf (nærmeste) → OSRM (rute) → rutelag + tid/avstand
 python3 -m http.server 8000
 
 **Åpne:**  http://localhost:8000
+**Demo-video:** https://drive.google.com/file/d/1_9Z-YgZY2Djvj7SgpeqAw1mw3zZdA9S7/view?usp=sharing
