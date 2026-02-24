@@ -98,6 +98,11 @@ def create_table_and_policy():
         ALTER TABLE public.drikkevann ENABLE ROW LEVEL SECURITY;
         """,
         
+        # Drop existing policy if present, then recreate (idempotent)
+        """
+        DROP POLICY IF EXISTS "Allow public read access to drikkevann" ON public.drikkevann;
+        """,
+
         # Create policy for public read access
         """
         CREATE POLICY "Allow public read access to drikkevann" ON public.drikkevann
