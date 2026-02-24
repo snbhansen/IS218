@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <title>Beredskaps Kart</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
+    
+    <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Inter', Arial, sans-serif; }
+        html, body, #map { height: 100%; }
+
+        #ui-container {
+            position: absolute; top: 10px; left: 10px; width: 320px;
+            z-index: 1000; display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .panel-box {
+            background: rgba(255, 255, 255, 0.95); padding: 15px;
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        #layer-control h3 { margin: 0 0 10px 0; font-size: 16px; }
+        #layer-control label { display: block; margin: 5px 0; cursor: pointer; font-size: 14px; }
+
+        .search-box { display: flex; gap: 5px; margin-bottom: 10px; }
+        input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 12px; border: none; background: #2563eb; color: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1d4ed8; }
+
+        select { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+
+        .transport-toggles { display: flex; gap: 5px; margin-top: 10px; }
+        .mode-btn { flex: 1; background: #f1f5f9; color: #333; border: 1px solid #ccc; }
+        .mode-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+        #result-area { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: none; }
+        .res-highlight { font-size: 1.2rem; font-weight: bold; color: #166534; }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <div id="ui-container">
+        <div class="panel-box">
+            <h3><i class="fa-solid fa-route"></i> Find Shelter</h3>
+            
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search address...">
+                <button id="btn-search"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </div>
+
+            <div style="text-align: center; margin: 5px 0; font-size: 0.8em; color: #666;">- or -</div>
+
+            <button id="btn-find-me" style="width: 100%; background: #0f172a;">
+                <i class="fa-solid fa-location-arrow"></i> Use my location
+            </button>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+            <label for="target-category" style="font-size: 0.9em; font-weight: bold;">What are you looking for?</label>
+            <select id="target-category">
+                <option value="tilfluktsrom">Nearest Shelter</option>
+                <option value="brannstasjoner">Nearest Fire Station</option>
+                <option value="sykehus">Nearest Hospital</option>
+            </select>
+
+            <div class="transport-toggles">
+                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i> Walk</button>
+                <button class="mode-btn" data-mode="driving"><i class="fa-solid fa-car"></i> Drive</button>
+            </div>
+
+            <div id="result-area">
+                <div style="font-size: 0.9em; color: #555;">Distance / Time:</div>
+                <div id="res-info" class="res-highlight">-</div>
+                <div id="res-dest" style="font-size: 0.85em; margin-top: 4px;"></div>
+            </div>
+        </div>
+
+        <div class="panel-box" id="layer-control">
+            <h3>View (Layers)</h3>
+            <label><input type="checkbox" id="toggle-tilfluktsrom" checked /> Shelters</label>
+            <label><input type="checkbox" id="toggle-brannstasjoner" checked /> Fire Stations</label>
+            <label><input type="checkbox" id="toggle-sykehus" checked /> Hospitals</label>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
