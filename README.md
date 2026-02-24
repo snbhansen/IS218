@@ -43,9 +43,9 @@ Vi bruker MapLibre fordi det er en moderne kartmotor som håndterer interaktive 
 - Kilde: Supabase/PostGIS (`brannstasjoner`)  
 - Bruk i app: Hentes i `app.js`, gjøres om til GeoJSON, vises som eget lag + popup. Brukes i “nærmeste”.
 
-**Sykehus**  
-- Kilde: Supabase/PostGIS (`sykehus`)  
-- Bruk i app: Hentes i `app.js` (navn/telefon/geometri) og vises som kartlag + popup.
+**Sykehus**
+- Kilde: Supabase/PostGIS (`sykehus`)
+- Bruk i app: Hentes i `app.js` via egen `fetchHospitals()`-funksjon som henter kolonnene `name`, `phone` og `WKT`. Vises som kartlag + popup. Brukes i "nærmeste".
 
 **Adresse-søk**  
 - Kilde: Nominatim API (OpenStreetMap)  
@@ -59,11 +59,11 @@ Vi bruker MapLibre fordi det er en moderne kartmotor som håndterer interaktive 
 -------
 
 ### Kort om databehandling og opplasting
-Vi har GeoJSON-filer lokalt (f.eks. `tilfluktsrom.geojson` og `brannstasjoner.geojson`). Scriptet `upload_data.py` brukes til å laste disse inn i Supabase-tabeller, der geometri lagres som punkt (typisk POINT-representasjon) i en kolonne som f.eks. `location`.
+Vi har GeoJSON-filer lokalt (`tilfluktsrom.geojson`, `brannstasjoner.geojson` og `sykehus.geojson`). Scriptet `upload_data.py` brukes til å laste `tilfluktsrom` og `brannstasjoner` inn i Supabase-tabeller, der geometri lagres som punkt (WKT-format: `POINT(lon lat)`) i kolonnen `location`. Sykehusdata (`sykehus.geojson`) er lastet opp manuelt/separat og lagret med en `WKT`-kolonne i databasen.
 
 ## Interaktivitet 
 - **Popups:** Klikk på punkter for å vise attributter (navn, adresse, telefon osv.).
-- **Datadrevet styling:** Eget kartlag per kategori + rutelag, slik at “data” og “resultat” er tydelig skilt.
+- **Lag-separasjon:** Eget kartlag per kategori + rutelag med faste farger (gul, rød, grønn), slik at “data” og “resultat” er tydelig skilt.
 - **Layer control:** Brukeren kan slå lag av/på via checkbokser (tilfluktsrom, brannstasjoner, sykehus).
 - **Romlig spørring:** Turf (`nearestPoint`) finner nærmeste objekt fra brukerposisjon, og dette brukes som mål for ruting.
 
@@ -81,6 +81,7 @@ Vi har valgt en løsning der mest mulig skjer i nettleseren (client-side) for å
 ```text
 Supabase/PostGIS → app.js → GeoJSON → MapLibre (lag + popups + toggles)
 GPS/Adresse → Turf (nærmeste) → OSRM (rute) → rutelag + tid/avstand
+```
 
 -------
 
@@ -106,9 +107,4 @@ GPS/Adresse → Turf (nærmeste) → OSRM (rute) → rutelag + tid/avstand
 python3 -m http.server 8000
 
 **Åpne:**  http://localhost:8000
-
-
-
-
-
-
+**Demo-video:** https://drive.google.com/file/d/1_9Z-YgZY2Djvj7SgpeqAw1mw3zZdA9S7/view?usp=sharing
