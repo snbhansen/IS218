@@ -1,31 +1,31 @@
-// --- SUPABASE KONFIGURASJON ---
+// --- SUPABASE CONFIGURATION ---
 const SUPABASE_URL = 'https://wqfpqpvdicvejbvnplcf.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxZnBxcHZkaWN2ZWpidm5wbGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMDMyMzEsImV4cCI6MjA4NTc3OTIzMX0.S7Hl1YuOmzN6VpZTUnHus1PGUNb8r7bWGdcDdubys9o';
+const SUPABASE_KEY = 'sb_publishable_c9St0FCq1CXFQr5C1Ba3Hg_xGovKgNN';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // GLOBAL VARIABLES
 let map;
-let currentPos = null;
-let transportMode = 'walking';
+let currentPosition = null;
+let travelMode = 'walking';
 let userMarker = null;
-let mapLoaded = false;
+let isMapLoaded = false;
 let dataCache = {
     tilfluktsrom: null,
     brannstasjoner: null,
-    sykehus: null
+    sykehus: null,
+    drikkevann: null
 };
 
-// --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
-async function fetchGeoJSON(tableName) {
-    console.log(`Henter data fra tabell: ${tableName}...`);
+// --- HELPER FUNCTION TO HANDLE HEX-ENCODED GEOMETRY ---
+async function fetchSupabaseGeoJson(tableName) {
+    console.log(`Fetching data from table: ${tableName}...`);
     
-    // Vi henter alt data som det er
     const { data, error } = await supabaseClient
         .from(tableName)
-        .select('*'); 
+        .select('*');
 
     if (error) {
-        console.error(`Feil fra Supabase (${tableName}):`, error);
+        console.error(`Error from Supabase (${tableName}):`, error);
         return null;
     }
 
@@ -34,29 +34,28 @@ async function fetchGeoJSON(tableName) {
 
         let coords = [];
 
-        // SJEKK 1: Er det Hex-kode? (Starter ofte på 0101000020...)
+        // CHECK 1: Is it Hex-encoded? (Often starts with 0101000020...)
         if (typeof row.location === 'string' && row.location.length > 20) {
             try {
-                // Magisk formel for å lese PostGIS Hex-format (Little Endian)
                 const hex = row.location;
-                // Lengdegrad ligger fra tegn 18 til 34, Breddegrad fra 34 til 50
+                // Longitude from character 18 to 34, Latitude from 34 to 50
                 const lonHex = hex.substring(18, 34);
                 const latHex = hex.substring(34, 50);
                 
-                // Hjelper for å gjøre om hex til tall
+                // Helper to convert hex to float
                 const parseHexFloat = (h) => {
                     const view = new DataView(new ArrayBuffer(8));
                     h.match(/.{1,2}/g).forEach((b, i) => view.setUint8(i, parseInt(b, 16)));
-                    return view.getFloat64(0, true); // true betyr Little Endian
+                    return view.getFloat64(0, true); // true means Little Endian
                 };
 
                 coords = [parseHexFloat(lonHex), parseHexFloat(latHex)];
             } catch (e) {
-                console.error("Kunne ikke lese hex-kode:", row.location);
+                console.error("Could not parse hex-encoded geometry:", row.location);
                 return null;
             }
         } 
-        // SJEKK 2: Er det JSON? (Hvis Supabase endrer format i fremtiden)
+        // CHECK 2: Is it JSON? (If Supabase changes format in the future)
         else if (row.location.coordinates) {
             coords = row.location.coordinates;
         }
@@ -81,7 +80,7 @@ async function fetchGeoJSON(tableName) {
 
     }).filter(f => f !== null);
 
-    console.log(`Ferdig behandlet ${features.length} punkter for ${tableName}.`);
+    console.log(`Processed ${features.length} points for ${tableName}.`);
     return { type: 'FeatureCollection', features: features };
 }
 
@@ -117,14 +116,14 @@ try {
 // DATA LOADING
 map.on('load', async () => {
     console.log("Map loaded. Fetching data from Supabase...");
-    mapLoaded = true;
+    isMapLoaded = true;
 
-    // Prøv å laste ikon
+    // Try to load icon
     let iconLoaded = false;
-    try { await loadTilfluktsromIcon(map); iconLoaded = true; } catch (e) {}
+    try { await loadShelterIcon(map); iconLoaded = true; } catch (e) {}
 
-    // 1. Hent Tilfluktsrom
-    const shelters = await fetchGeoJSON('tilfluktsrom');
+    // 1. Fetch Shelters
+    const shelters = await fetchSupabaseGeoJson('tilfluktsrom');
     if (shelters) {
         dataCache.tilfluktsrom = shelters;
         map.addSource('tilfluktsrom-source', { type: 'geojson', data: shelters });
@@ -146,8 +145,8 @@ map.on('load', async () => {
         }
     }
 
-    // 2. Hent Brannstasjoner
-    const stations = await fetchGeoJSON('brannstasjoner');
+    // 2. Fetch Fire Stations
+    const stations = await fetchSupabaseGeoJson('brannstasjoner');
     if (stations) {
         dataCache.brannstasjoner = stations;
         map.addSource('brannstasjoner', { type: 'geojson', data: stations });
@@ -159,36 +158,35 @@ map.on('load', async () => {
         });
     }
 
-    // 3. Hent Sykehuser
-   // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
+    // 3. Fetch Hospitals
     async function fetchHospitals() {
-    console.log("Henter data fra sykehus...");
-    const { data, error } = await supabaseClient
-        .from('sykehus')
-        .select('name, phone, WKT');
+        console.log("Fetching data from hospitals...");
+        const { data, error } = await supabaseClient
+            .from('sykehus')
+            .select('name, phone, WKT');
 
-    if (error) {
-        console.error("Feil fra Supabase (sykehus):", error);
-        return null;
+        if (error) {
+            console.error("Error from Supabase (sykehus):", error);
+            return null;
+        }
+
+        const features = data.map(row => {
+            if (!row.WKT || row.WKT.type !== 'Point') return null;
+
+            return {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: row.WKT.coordinates },
+                properties: { 
+                    name: row.name,
+                    phone: row.phone || null
+                }
+            };
+        }).filter(f => f !== null);
+
+        console.log(`Processed ${features.length} hospital points.`);
+        return { type: 'FeatureCollection', features };
     }
-
-    const features = data.map(row => {
-        if (!row.WKT || row.WKT.type !== 'Point') return null;
-
-        return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: row.WKT.coordinates },
-            properties: { 
-                name: row.name,
-                phone: row.phone || null
-            }
-        };
-    }).filter(f => f !== null);
-
-    console.log(`Ferdig behandlet ${features.length} sykehus-punkter.`);
-    return { type: 'FeatureCollection', features };
-}
- const hospitals = await fetchHospitals();
+    const hospitals = await fetchHospitals();
 
     if (hospitals) {
         dataCache.sykehus = hospitals;
@@ -201,7 +199,105 @@ map.on('load', async () => {
         });
     }
 
-    // 4. Rute-lag (tomt foreløpig)
+    // 3.5 Fetch Drinking Water from Supabase
+    try {
+        console.log("Fetching drinking water from Supabase table: drikkevann_geojson...");
+        
+        const { data, error } = await supabaseClient
+            .from('drikkevann_geojson')
+            .select('id, name, geom');
+
+        if (error) {
+            console.error("Error from Supabase (drikkevann_geojson):", error);
+            throw error;
+        }
+
+        console.log(`Fetched ${data?.length || 0} rows from drikkevann_geojson table.`);
+
+        // Build GeoJSON FeatureCollection for polygons
+        const drikkevannPolygons = {
+            type: 'FeatureCollection',
+            features: (data || []).map(row => {
+                if (!row.geom) return null;
+                return {
+                    type: 'Feature',
+                    geometry: row.geom,
+                    properties: {
+                        id: row.id,
+                        name: row.name || null
+                    }
+                };
+            }).filter(f => f !== null)
+        };
+
+        console.log(`Built FeatureCollection with ${drikkevannPolygons.features.length} features.`);
+
+        // Log geometry types for verification
+        const geomTypes = { Polygon: 0, MultiPolygon: 0, Point: 0, other: 0 };
+        drikkevannPolygons.features.forEach(f => {
+            const type = f.geometry?.type;
+            if (type === 'Polygon') geomTypes.Polygon++;
+            else if (type === 'MultiPolygon') geomTypes.MultiPolygon++;
+            else if (type === 'Point') geomTypes.Point++;
+            else geomTypes.other++;
+        });
+        console.log('Drinking water geometry type counts:', geomTypes);
+
+        if (drikkevannPolygons.features.length > 0) {
+            const firstGeomType = drikkevannPolygons.features[0].geometry?.type;
+            console.log(`First feature geometry type: ${firstGeomType}`);
+        }
+
+        // Add polygon source and layers
+        map.addSource('drikkevann-polygons', { type: 'geojson', data: drikkevannPolygons });
+
+        map.addLayer({id: 'drikkevann-centroid', type: 'circle', source: 'drikkevann-polygons', maxzoom: 13,
+            paint: {
+                    'circle-radius': 5,
+                    'circle-color': '#2563eb',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#fff'
+                    }
+                    });
+        
+        map.addLayer({
+            id: 'drikkevann-fill',
+            type: 'fill',
+            source: 'drikkevann-polygons',
+            minzoom: 14,
+            paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.6 }
+        });
+        
+        map.addLayer({
+            id: 'drikkevann-outline',
+            type: 'line',
+            minzoom: 14,
+            source: 'drikkevann-polygons',
+            paint: { 'line-color': '#1e40af', 'line-width': 3 }
+        });
+
+        // Create point FeatureCollection for routing using turf.pointOnFeature
+        const drikkevannPoints = {
+            type: 'FeatureCollection',
+            features: drikkevannPolygons.features.map(feature => {
+                const point = turf.pointOnFeature(feature);
+                return {
+                    type: 'Feature',
+                    geometry: point.geometry,
+                    properties: { ...feature.properties }
+                };
+            })
+        };
+
+        console.log(`Processed ${drikkevannPoints.features.length} drinking water points for routing.`);
+        dataCache.drikkevann = drikkevannPoints;
+
+    } catch (e) {
+        console.error("Error loading drinking water data from Supabase:", e);
+    }
+
+
+    // 4. Route layer (empty initially)
     map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
     map.addLayer({
         id: 'route-layer',
@@ -225,7 +321,7 @@ map.on('click', 'tilfluktsrom-layer', (e) => {
 map.on('click', 'brannstasjoner-layer', (e) => {
     const p = e.features[0].properties;
     const brannstasjon = p.brannstasjon ? `<br><b>Location:</b> ${p.brannstasjon}` : '';
-    const brannvesen = p.brannvesen ? `<br><b>Fire Deptartment:</b> ${p.brannvesen}` : ''; 
+    const brannvesen = p.brannvesen ? `<br><b>Fire Department:</b> ${p.brannvesen}` : ''; 
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>FIRE STATION</b>${brannstasjon}${brannvesen}`).addTo(map);
 });
 
@@ -234,6 +330,12 @@ map.on('click', 'sykehus-layer', (e) => {
     const name = p.name ? `<br><b>Name:</b> ${p.name}` : '';
     const phone = p.phone ? `<br><b>Phone:</b> ${p.phone}` : '';
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>HOSPITAL</b>${name}${phone}`).addTo(map);
+});
+
+map.on('click', 'drikkevann-fill', (e) => {
+    const p = e.features[0].properties || {};
+    const label = p.name || 'Drinking water area';
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>DRINKING WATER AREA</b><br>${label}`).addTo(map);
 });
 
 // UI CONTROLS
@@ -263,28 +365,33 @@ function setupControls() {
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
 
     // Dropdown & Toggles
-    document.getElementById('target-category').addEventListener('change', () => { if (currentPos) calculateRoute(); });
+    document.getElementById('target-category').addEventListener('change', () => { if (currentPosition) calculateRoute(); });
     
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
-            transportMode = e.currentTarget.dataset.mode;
-            if (currentPos) calculateRoute();
+            travelMode = e.currentTarget.dataset.mode;
+            if (currentPosition) calculateRoute();
         });
     });
 
     // Layer Checkboxes
     const toggles = [
-        { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
-        { id: 'toggle-brannstasjoner', layer: 'brannstasjoner-layer' },
-        { id: 'toggle-sykehus', layer: 'sykehus-layer' }
+        { id: 'toggle-tilfluktsrom', layers: ['tilfluktsrom-layer'] },
+        { id: 'toggle-brannstasjoner', layers: ['brannstasjoner-layer'] },
+        { id: 'toggle-sykehus', layers: ['sykehus-layer'] },
+        { id: 'toggle-drikkevann', layers: ['drikkevann-centroid', 'drikkevann-fill', 'drikkevann-outline'] }
     ];
     toggles.forEach(t => {
         const el = document.getElementById(t.id);
         if (el) el.addEventListener('change', (e) => {
-            if (mapLoaded && map.getLayer(t.layer)) {
-                map.setLayoutProperty(t.layer, 'visibility', e.target.checked ? 'visible' : 'none');
+            if (isMapLoaded) {
+                t.layers.forEach(layerId => {
+                    if (map.getLayer(layerId)) {
+                        map.setLayoutProperty(layerId, 'visibility', e.target.checked ? 'visible' : 'none');
+                    }
+                });
             }
         });
     });
@@ -292,7 +399,7 @@ function setupControls() {
 
 // ROUTING LOGIC
 function setUserLocation(coords) {
-    currentPos = coords;
+    currentPosition = coords;
     map.flyTo({ center: coords, zoom: 14 });
 
     if (userMarker) userMarker.remove();
@@ -304,13 +411,13 @@ function setUserLocation(coords) {
 }
 
 async function calculateRoute() {
-    if (!currentPos || !mapLoaded) return;
+    if (!currentPosition || !isMapLoaded) return;
     const category = document.getElementById('target-category').value;
     const targetData = dataCache[category];
 
     if (!targetData) return alert("Data not loaded yet.");
 
-    const userPoint = turf.point(currentPos);
+    const userPoint = turf.point(currentPosition);
     const nearest = turf.nearestPoint(userPoint, targetData);
     if (!nearest) return;
 
@@ -319,13 +426,13 @@ async function calculateRoute() {
 
     let serviceUrl = 'https://router.project-osrm.org/route/v1';
     let profile = 'driving';
-    if (transportMode === 'walking') {
+    if (travelMode === 'walking') {
         serviceUrl = 'https://routing.openstreetmap.de/routed-foot/route/v1';
         profile = 'foot';
     }
 
     try {
-        const res = await fetch(`${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`);
+        const res = await fetch(`${serviceUrl}/${profile}/${currentPosition[0]},${currentPosition[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`);
         const json = await res.json();
 
         if (json.routes && json.routes.length > 0) {
@@ -339,13 +446,18 @@ async function calculateRoute() {
             document.getElementById('result-area').style.display = 'block';
             document.getElementById('res-info').innerText = `${Math.round(route.duration / 60)} min  /  ${(route.distance / 1000).toFixed(1)} km`;
             
-            const destName = props.navn || props.adresse || props.brannstasjon || "Destination";
+            let destName = "Destination";
+            if (category === 'drikkevann') {
+                destName = props.name || 'Drinking water';
+            } else {
+                destName = props.navn || props.adresse || props.brannstasjon || "Destination";
+            }
             document.getElementById('res-dest').innerHTML = `To: <b>${destName}</b>`;
         }
     } catch (err) { console.error("Routing error:", err); }
 }
 
-function loadTilfluktsromIcon(mapInstance) {
+function loadShelterIcon(mapInstance) {
     if (mapInstance.hasImage('tilfluktsrom-icon')) return Promise.resolve();
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
         <rect x="2" y="2" width="28" height="28" fill="#FFD700" stroke="#000" stroke-width="2"/>

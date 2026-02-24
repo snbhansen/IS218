@@ -1,58 +1,127 @@
 import json
 import os
+import sys
+from dotenv import load_dotenv
 from supabase import create_client, Client
 
-# --- FYLL INN NØKLENE DINE HER (Fra Project Settings -> API) ---
-URL = "https://wqfpqpvdicvejbvnplcf.supabase.co"
-KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxZnBxcHZkaWN2ZWpidm5wbGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMDMyMzEsImV4cCI6MjA4NTc3OTIzMX0.S7Hl1YuOmzN6VpZTUnHus1PGUNb8r7bWGdcDdubys9o"
+# Load environment variables from .env file
+load_dotenv()
 
-supabase: Client = create_client(URL, KEY)
+# Supabase configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-def upload_data(filename, table_name, mapping_func):
-    filepath = f'data/{filename}'
-    if not os.path.exists(filepath):
-        print(f"⚠️ Finner ikke {filepath}")
-        return
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env file.")
+    sys.exit(1)
 
-    with open(filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+# Initialize Supabase client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    print(f"Laster opp {len(data['features'])} rader til {table_name}...")
+def upload_drinking_water():
+    """Upload drinking water GeoJSON from data/drikkevann.geojson to Supabase."""
     
+    geojson_path = 'data/drikkevann.geojson'
+    
+    # Load GeoJSON
+    if not os.path.exists(geojson_path):
+        print(f"Error: {geojson_path} not found.")
+        return
+    
+    with open(geojson_path, 'r', encoding='utf-8') as f:
+        geojson_data = json.load(f)
+    
+    features = geojson_data.get('features', [])
+    print(f"Loaded {len(features)} features from {geojson_path}")
+    
+    # Prepare rows for insertion
     rows = []
-    for feature in data['features']:
-        props = feature['properties']
-        coords = feature['geometry']['coordinates']
+    for idx, feature in enumerate(features):
+        geometry = feature.get('geometry')
+        properties = feature.get('properties', {})
         
-        # Konverter til PostGIS-format: POINT(lon lat)
-        location_wkt = f"POINT({coords[0]} {coords[1]})"
+        # Skip if no geometry
+        if not geometry:
+            print(f"  Skipping feature {idx}: no geometry")
+            continue
         
-        row = mapping_func(props, location_wkt)
+        geom_type = geometry.get('type')
+        
+        # Only accept Polygon, MultiPolygon, and Point
+        if geom_type not in ['Polygon', 'MultiPolygon', 'Point']:
+            print(f"  Skipping feature {idx}: unsupported geometry type {geom_type}")
+            continue
+        
+        row = {
+            'name': properties.get('name'),
+            'geom': geometry  # Store as GeoJSON geometry object
+        }
         rows.append(row)
+    
+    print(f"Prepared {len(rows)} rows for upload")
+    
+    # Insert in batches
+    batch_size = 100
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i:i + batch_size]
+        try:
+            response = supabase.table('drikkevann').insert(batch).execute()
+            print(f"  Batch {i // batch_size + 1}: Inserted {len(batch)} rows")
+        except Exception as e:
+            print(f"  Error inserting batch {i // batch_size + 1}: {e}")
+    
+    print("Upload complete!")
 
-    try:
-        supabase.table(table_name).insert(rows).execute()
-        print(f"✅ {table_name} ferdig opplastet!")
-    except Exception as e:
-        print(f"❌ Feil ved {table_name}: {e}")
+def create_table_and_policy():
+    """
+    Create drikkevann table with geometry column and RLS policy.
+    Run this once before uploading data.
+    """
+    sql_commands = [
+        # Create table with geometry column
+        """
+        CREATE TABLE IF NOT EXISTS public.drikkevann (
+            id BIGSERIAL PRIMARY KEY,
+            name TEXT,
+            geom GEOMETRY(GEOMETRY, 4326),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """,
+        
+        # Create spatial index on geom
+        """
+        CREATE INDEX IF NOT EXISTS drikkevann_geom_idx ON public.drikkevann USING GIST (geom);
+        """,
+        
+        # Enable RLS
+        """
+        ALTER TABLE public.drikkevann ENABLE ROW LEVEL SECURITY;
+        """,
+        
+        # Drop existing policy if present, then recreate (idempotent)
+        """
+        DROP POLICY IF EXISTS "Allow public read access to drikkevann" ON public.drikkevann;
+        """,
 
-# Hjelpefunksjoner for å koble GeoJSON-felt til Database-kolonner
-def map_tilfluktsrom(p, loc):
-    return {
-        "navn": p.get("navn", ""),
-        "adresse": p.get("adresse", ""),
-        "plasser": int(p.get("plasser", 0)) if p.get("plasser") else 0,
-        "romnr": p.get("romnr", ""),
-        "location": loc
-    }
+        # Create policy for public read access
+        """
+        CREATE POLICY "Allow public read access to drikkevann" ON public.drikkevann
+        FOR SELECT
+        USING (true);
+        """
+    ]
+    
+    print("Run these SQL commands in Supabase SQL Editor:")
+    for cmd in sql_commands:
+        print(cmd.strip())
+        print("---")
 
-def map_brann(p, loc):
-    return {
-        "brannstasjon": p.get("brannstasjon", ""),
-        "brannvesen": p.get("brannvesen", ""),
-        "location": loc
-    }
-
-if __name__ == "__main__":
-    upload_data('tilfluktsrom.geojson', 'tilfluktsrom', map_tilfluktsrom)
-    upload_data('brannstasjoner.geojson', 'brannstasjoner', map_brann)
+if __name__ == '__main__':
+    print("Supabase GeoJSON Upload Script")
+    print("=" * 40)
+    
+    # Uncomment to create table and RLS policy (run once)
+    # create_table_and_policy()
+    
+    # Upload data
+    upload_drinking_water()
