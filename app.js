@@ -31,54 +31,62 @@ async function fetchGeoJSON(tableName) {
     }
 
     const features = data.map(row => {
-        if (!row.location) return null;
+        const { location, ...properties } = row;
+        if (!location) return null;
 
-        let coords = [];
+        // Helper: parse 8-byte float from hex (little-endian)
+        const parseHexFloat = (h) => {
+            const bytes = h.match(/.{1,2}/g) || [];
+            if (bytes.length !== 8) throw new Error('Invalid float hex');
+            const view = new DataView(new ArrayBuffer(8));
+            bytes.forEach((b, i) => view.setUint8(i, parseInt(b, 16)));
+            return view.getFloat64(0, true);
+        };
 
-        // SJEKK 1: Er det Hex-kode? (Starter ofte på 0101000020...)
-        if (typeof row.location === 'string' && row.location.length > 20) {
+        let geometry = null;
+
+        // Case A: location is a JSON string (GeoJSON)
+        if (typeof location === 'string') {
             try {
-                // Magisk formel for å lese PostGIS Hex-format (Little Endian)
-                const hex = row.location;
-                // Lengdegrad ligger fra tegn 18 til 34, Breddegrad fra 34 til 50
-                const lonHex = hex.substring(18, 34);
-                const latHex = hex.substring(34, 50);
-                
-                // Hjelper for å gjøre om hex til tall
-                const parseHexFloat = (h) => {
-                    const view = new DataView(new ArrayBuffer(8));
-                    h.match(/.{1,2}/g).forEach((b, i) => view.setUint8(i, parseInt(b, 16)));
-                    return view.getFloat64(0, true); // true betyr Little Endian
-                };
-
-                coords = [parseHexFloat(lonHex), parseHexFloat(latHex)];
+                const parsed = JSON.parse(location);
+                if (parsed && parsed.type) geometry = parsed;
             } catch (e) {
-                console.error("Kunne ikke lese hex-kode:", row.location);
+                // Fallback: try to interpret as PostGIS WKB hex (very common prefix 01010000)
+                const hex = location.replace(/^0x/i, '');
+                if (hex && hex.length >= 50 && /^01010000/i.test(hex)) {
+                    try {
+                        const lonHex = hex.substring(18, 34);
+                        const latHex = hex.substring(34, 50);
+                        const lon = parseHexFloat(lonHex);
+                        const lat = parseHexFloat(latHex);
+                        geometry = { type: 'Point', coordinates: [lon, lat] };
+                    } catch (err) {
+                        console.warn('Kunne ikke tolke WKB-hex for rad:', err);
+                    }
+                }
+            }
+        }
+
+        // Case B: location is already an object
+        if (!geometry && typeof location === 'object') {
+            if (location.type) geometry = location;
+            else if (location.coordinates) geometry = { type: 'Point', coordinates: location.coordinates };
+        }
+
+        if (!geometry) return null;
+
+        // Convert non-point geometries to a representative point
+        if (geometry.type !== 'Point') {
+            try {
+                const pt = turf.pointOnFeature(geometry);
+                geometry = pt.geometry;
+            } catch (err) {
+                console.warn('Kunne ikke regne ut punkt fra geometri:', err);
                 return null;
             }
-        } 
-        // SJEKK 2: Er det JSON? (Hvis Supabase endrer format i fremtiden)
-        else if (row.location.coordinates) {
-            coords = row.location.coordinates;
         }
 
-        const { location, ...properties } = row;
-
-        if (row.location && row.location.type) {
-            const point = turf.pointOnFeature(row.location);
-
-            return {
-                type: 'Feature',
-                geometry: point.geometry,
-                properties: properties  
-            }
-        }
-
-        return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: coords },
-            properties: properties
-        };
+        return { type: 'Feature', geometry, properties };
 
     }).filter(f => f !== null);
 
@@ -215,8 +223,8 @@ map.on('load', async () => {
         });
     }
 
-    // 4. Rute-lag (tomt foreløpig)
-    map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
+    // 4. Rute-lag (tomt foreløpig) - bruk FeatureCollection som utgangspunkt
+    map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
         id: 'route-layer',
         type: 'line',
@@ -227,6 +235,101 @@ map.on('load', async () => {
 
     setupControls();
 });
+
+// ─── DEL B: KLIKK-BASERT ROMLIG SPØRRING VIA SUPABASE POSTGIS ───────────────
+let clickModeActive = false;
+let clickMarker     = null;
+let nearbyMarkers   = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const slider = document.getElementById('radius-slider');
+    const label  = document.getElementById('radius-label');
+    if (slider) slider.addEventListener('input', () => { label.textContent = slider.value + ' m'; });
+
+    const btn = document.getElementById('btn-click-mode');
+    if (btn) btn.addEventListener('click', () => {
+        clickModeActive = !clickModeActive;
+        btn.classList.toggle('active', clickModeActive);
+        btn.innerHTML = clickModeActive
+            ? '<i class="fa-solid fa-circle-xmark"></i> Click mode ON – click map'
+            : '<i class="fa-solid fa-crosshairs"></i> Click map to search';
+        map.getCanvas().style.cursor = clickModeActive ? 'crosshair' : '';
+        if (!clickModeActive) clearNearbyResults();
+    });
+});
+
+map.on('click', async (e) => {
+    if (!clickModeActive) return;
+    const lng    = e.lngLat.lng;
+    const lat    = e.lngLat.lat;
+    const radius = parseInt(document.getElementById('radius-slider').value, 10);
+    showClickCircle(lng, lat, radius);
+    const { data, error } = await supabaseClient.rpc('finn_naerliggende', {
+        klikk_lng: lng, klikk_lat: lat, radius_m: radius
+    });
+    if (error) {
+        console.error('Supabase RPC-feil:', error);
+        const panel = document.getElementById('nearby-results');
+        panel.style.display = 'block';
+        panel.innerHTML = '<span style="color:red;">Feil ved romlig spørring. Sjekk konsollen.</span>';
+        return;
+    }
+    renderNearbyResults(data);
+});
+
+function showClickCircle(lng, lat, radius) {
+    const circle = turf.circle([lng, lat], radius / 1000, { steps: 64, units: 'kilometers' });
+    if (map.getSource('click-circle')) {
+        map.getSource('click-circle').setData(circle);
+    } else {
+        map.addSource('click-circle', { type: 'geojson', data: circle });
+        map.addLayer({ id: 'click-circle-fill', type: 'fill', source: 'click-circle',
+            paint: { 'fill-color': '#7c3aed', 'fill-opacity': 0.12 } });
+        map.addLayer({ id: 'click-circle-outline', type: 'line', source: 'click-circle',
+            paint: { 'line-color': '#7c3aed', 'line-width': 2, 'line-dasharray': [3, 2] } });
+    }
+    if (clickMarker) clickMarker.remove();
+    const el = document.createElement('div');
+    el.innerHTML = '<i class="fa-solid fa-crosshairs" style="color:#7c3aed;font-size:26px;filter:drop-shadow(0 0 3px #fff);"></i>';
+    clickMarker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([lng, lat]).addTo(map);
+}
+
+function renderNearbyResults(data) {
+    nearbyMarkers.forEach(m => m.remove());
+    nearbyMarkers = [];
+    const panel = document.getElementById('nearby-results');
+    panel.style.display = 'block';
+    if (!data || data.length === 0) {
+        panel.innerHTML = '<span style="color:#888;">No resources found within radius.</span>';
+        return;
+    }
+    const colors = { tilfluktsrom: '#FFD700', brannstasjon: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
+    const ikoner  = { tilfluktsrom: '🟡', brannstasjon: '🔴', sykehus: '🟢', drikkevann: '🔵' };
+    data.forEach(item => {
+        const el = document.createElement('div');
+        el.style.cssText = `width:13px;height:13px;background:${colors[item.ressurs_type]||'#888'};border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);`;
+        nearbyMarkers.push(new maplibregl.Marker({ element: el }).setLngLat([item.lon, item.lat_out]).addTo(map));
+    });
+    const grouped = {};
+    data.forEach(d => { if (!grouped[d.ressurs_type]) grouped[d.ressurs_type] = []; grouped[d.ressurs_type].push(d); });
+    let html = `<div style="font-weight:bold;margin-bottom:6px;">📍 ${data.length} resource(s) within ${document.getElementById('radius-slider').value} m:</div>`;
+    for (const [type, items] of Object.entries(grouped)) {
+        html += `<div style="margin-top:5px;font-weight:bold;">${ikoner[type]||'📌'} ${type} (${items.length})</div>`;
+        items.forEach(it => { html += `<div class="nearby-item" style="margin-left:14px;">${it.navn} <span style="color:#888;">– ${Math.round(it.distanse_m)} m</span></div>`; });
+    }
+    panel.innerHTML = html;
+}
+
+function clearNearbyResults() {
+    nearbyMarkers.forEach(m => m.remove());
+    nearbyMarkers = [];
+    if (clickMarker) { clickMarker.remove(); clickMarker = null; }
+    ['click-circle-fill', 'click-circle-outline'].forEach(id => { if (map.getLayer(id)) map.removeLayer(id); });
+    if (map.getSource('click-circle')) map.removeSource('click-circle');
+    const panel = document.getElementById('nearby-results');
+    if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 // INTERACTION
 map.on('click', 'tilfluktsrom-layer', (e) => {
