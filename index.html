@@ -45,6 +45,22 @@
 
         #result-area { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: none; }
         .res-highlight { font-size: 1.2rem; font-weight: bold; color: #166534; }
+
+        /* --- Radius-søk (Del B) --- */
+        #radius-panel { border-top: 1px solid #eee; margin-top: 14px; padding-top: 12px; }
+        #radius-panel .panel-title { font-size: 0.9em; font-weight: bold; margin-bottom: 8px; }
+        #radius-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        #radius-slider { flex: 1; accent-color: #7c3aed; }
+        #radius-label { font-size: 0.85em; min-width: 44px; color: #555; }
+        #btn-click-mode { width: 100%; background: #7c3aed; margin-bottom: 0; }
+        #btn-click-mode.active { background: #5b21b6; }
+        #nearby-results {
+            display: none; margin-top: 10px; padding: 8px 10px;
+            background: #f5f3ff; border: 1px solid #ddd6fe;
+            border-radius: 6px; font-size: 0.82em;
+            max-height: 200px; overflow-y: auto;
+        }
+        .nearby-item { padding: 2px 0; }
     </style>
 </head>
 
@@ -85,6 +101,19 @@
                 <div style="font-size: 0.9em; color: #555;">Distance / Time:</div>
                 <div id="res-info" class="res-highlight">-</div>
                 <div id="res-dest" style="font-size: 0.85em; margin-top: 4px;"></div>
+            </div>
+
+            <!-- Del B: Radius-søk -->
+            <div id="radius-panel">
+                <div class="panel-title"><i class="fa-solid fa-circle-dot"></i> Radius search (PostGIS)</div>
+                <div id="radius-row">
+                    <input type="range" id="radius-slider" min="100" max="2000" value="500" step="100">
+                    <span id="radius-label">500 m</span>
+                </div>
+                <button id="btn-click-mode">
+                    <i class="fa-solid fa-crosshairs"></i> Click map to search
+                </button>
+                <div id="nearby-results"></div>
             </div>
         </div>
 
