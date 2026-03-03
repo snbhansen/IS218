@@ -5,72 +5,247 @@
     <title>Beredskaps Kart</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
     <script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
-    
+
     <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        body { margin: 0; padding: 0; font-family: 'Inter', Arial, sans-serif; }
-        html, body, #map { height: 100%; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', Arial, sans-serif;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
 
         #ui-container {
-            position: absolute; top: 10px; left: 10px; width: 320px;
-            z-index: 1000; display: flex; flex-direction: column; gap: 10px;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 320px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .panel-box {
-            background: rgba(255, 255, 255, 0.95); padding: 15px;
-            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
-        #layer-control h3 { margin: 0 0 10px 0; font-size: 16px; }
-        #layer-control label { display: block; margin: 5px 0; cursor: pointer; font-size: 14px; }
+        #layer-control h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
 
-        .search-box { display: flex; gap: 5px; margin-bottom: 10px; }
-        input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 8px 12px; border: none; background: #2563eb; color: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #1d4ed8; }
+        #layer-control label {
+            display: block;
+            margin: 5px 0;
+            cursor: pointer;
+            font-size: 14px;
+        }
 
-        select { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .search-box {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
 
-        .transport-toggles { display: flex; gap: 5px; margin-top: 10px; }
-        .mode-btn { flex: 1; background: #f1f5f9; color: #333; border: 1px solid #ccc; }
-        .mode-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+        input[type="text"] {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
 
-        #result-area { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; display: none; }
-        .res-highlight { font-size: 1.2rem; font-weight: bold; color: #166534; }
+        button {
+            padding: 8px 12px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .transport-toggles {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            background: #f1f5f9;
+            color: #333;
+            border: 1px solid #ccc;
+        }
+
+        .mode-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        #result-area {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            display: none;
+        }
+
+        .res-highlight {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #166534;
+        }
 
         /* --- Radius-søk (Del B) --- */
-        #radius-panel { border-top: 1px solid #eee; margin-top: 14px; padding-top: 12px; }
-        #radius-panel .panel-title { font-size: 0.9em; font-weight: bold; margin-bottom: 8px; }
-        #radius-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        #radius-slider { flex: 1; accent-color: #7c3aed; }
-        #radius-label { font-size: 0.85em; min-width: 44px; color: #555; }
-        #btn-click-mode { width: 100%; background: #7c3aed; margin-bottom: 0; }
-        #btn-click-mode.active { background: #5b21b6; }
-        #nearby-results {
-            display: none; margin-top: 10px; padding: 8px 10px;
-            background: #f5f3ff; border: 1px solid #ddd6fe;
-            border-radius: 6px; font-size: 0.82em;
-            max-height: 200px; overflow-y: auto;
+        #radius-panel {
+            border-top: 1px solid #eee;
+            margin-top: 14px;
+            padding-top: 12px;
         }
-        .nearby-item { padding: 2px 0; }
+
+        #radius-panel .panel-title {
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        #radius-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        #radius-slider {
+            flex: 1;
+            accent-color: #7c3aed;
+        }
+
+        #radius-label {
+            font-size: 0.85em;
+            min-width: 44px;
+            color: #555;
+        }
+
+        #btn-click-mode {
+            width: 100%;
+            background: #7c3aed;
+            margin-bottom: 0;
+        }
+
+        #btn-click-mode.active {
+            background: #5b21b6;
+        }
+
+        #nearby-results {
+            display: none;
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            border-radius: 6px;
+            font-size: 0.82em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .nearby-item {
+            padding: 2px 0;
+        }
+
+        /* Custom bottom-right map buttons group */
+        #custom-map-controls {
+            position: absolute;
+            right: 16px;
+            bottom: 40px;
+            z-index: 1001;
+            display: grid;
+            grid-template-columns: repeat(2, 52px);
+            gap: 10px;
+        }
+
+        .map-btn-custom {
+            width: 52px;
+            height: 52px;
+            padding: 0;
+            background: #ffffff;
+            color: #333333;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s ease, transform 0.1s, outline 0.1s;
+        }
+
+        .map-btn-custom:hover {
+            background: #f1f5f9;
+        }
+
+        .map-btn-custom:active,
+        .map-btn-custom:focus {
+            background: #e2e8f0;
+            outline: 2px solid #2563eb;
+            outline-offset: -2px;
+            transform: scale(0.95);
+        }
     </style>
 </head>
 
 <body>
     <div id="map"></div>
 
+    <div id="custom-map-controls">
+        <button id="btn-locate" class="map-btn-custom" title="Finn min posisjon">
+            <i class="fa-solid fa-crosshairs"></i>
+        </button>
+        <button id="btn-zoom-in" class="map-btn-custom" title="Zoom inn">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+        <button id="btn-overview" class="map-btn-custom" title="Zoom ut til landnivå">
+            <i class="fa-solid fa-globe"></i>
+        </button>
+        <button id="btn-zoom-out" class="map-btn-custom" title="Zoom ut">
+            <i class="fa-solid fa-minus"></i>
+        </button>
+    </div>
+
     <div id="ui-container">
         <div class="panel-box">
             <h3><i class="fa-solid fa-route"></i> Find Shelter</h3>
-            
+
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Search address...">
                 <button id="btn-search"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -85,15 +260,16 @@
             <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
             <label for="target-category" style="font-size: 0.9em; font-weight: bold;">What are you looking for?</label>
-            <select id="target-category">          
-                <option value="drikkevann">Nearest Drinking Water</option>    
+            <select id="target-category">
+                <option value="drikkevann">Nearest Drinking Water</option>
                 <option value="brannstasjoner">Nearest Fire Station</option>
                 <option value="sykehus">Nearest Hospital</option>
                 <option value="tilfluktsrom">Nearest Shelter</option>
             </select>
 
             <div class="transport-toggles">
-                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i> Walk</button>
+                <button class="mode-btn active" data-mode="walking"><i class="fa-solid fa-person-running"></i>
+                    Walk</button>
                 <button class="mode-btn" data-mode="driving"><i class="fa-solid fa-car"></i> Drive</button>
             </div>
 
@@ -128,4 +304,5 @@
 
     <script src="./app.js"></script>
 </body>
+
 </html>
