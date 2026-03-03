@@ -19,11 +19,11 @@ let dataCache = {
 // --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
 async function fetchGeoJSON(tableName) {
     console.log(`Henter data fra tabell: ${tableName}...`);
-    
+
     // Vi henter alt data som det er
     const { data, error } = await supabaseClient
         .from(tableName)
-        .select('*'); 
+        .select('*');
 
     if (error) {
         console.error(`Feil fra Supabase (${tableName}):`, error);
@@ -120,7 +120,7 @@ try {
         center: [8.0182, 58.1467], // Kristiansand
         zoom: 12
     });
-    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    // Standard navigation control (zoom in/out) er fjernet herfra for å gi plass til vår custom 2x2 grid.
 } catch (err) { console.error("Map error:", err); }
 
 // DATA LOADING
@@ -130,14 +130,14 @@ map.on('load', async () => {
 
     // Prøv å laste ikon
     let iconLoaded = false;
-    try { await loadTilfluktsromIcon(map); iconLoaded = true; } catch (e) {}
+    try { await loadTilfluktsromIcon(map); iconLoaded = true; } catch (e) { }
 
     // 1. Hent Tilfluktsrom
     const shelters = await fetchGeoJSON('tilfluktsrom');
     if (shelters) {
         dataCache.tilfluktsrom = shelters;
         map.addSource('tilfluktsrom-source', { type: 'geojson', data: shelters });
-        
+
         if (iconLoaded) {
             map.addLayer({
                 id: 'tilfluktsrom-layer',
@@ -182,35 +182,35 @@ map.on('load', async () => {
     }
 
     // 4. Hent Sykehuser
-   // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
+    // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
     async function fetchHospitals() {
-    console.log("Henter data fra sykehus...");
-    const { data, error } = await supabaseClient
-        .from('sykehus')
-        .select('name, phone, WKT');
+        console.log("Henter data fra sykehus...");
+        const { data, error } = await supabaseClient
+            .from('sykehus')
+            .select('name, phone, WKT');
 
-    if (error) {
-        console.error("Feil fra Supabase (sykehus):", error);
-        return null;
+        if (error) {
+            console.error("Feil fra Supabase (sykehus):", error);
+            return null;
+        }
+
+        const features = data.map(row => {
+            if (!row.WKT || row.WKT.type !== 'Point') return null;
+
+            return {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: row.WKT.coordinates },
+                properties: {
+                    name: row.name,
+                    phone: row.phone || null
+                }
+            };
+        }).filter(f => f !== null);
+
+        console.log(`Ferdig behandlet ${features.length} sykehus-punkter.`);
+        return { type: 'FeatureCollection', features };
     }
-
-    const features = data.map(row => {
-        if (!row.WKT || row.WKT.type !== 'Point') return null;
-
-        return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: row.WKT.coordinates },
-            properties: { 
-                name: row.name,
-                phone: row.phone || null
-            }
-        };
-    }).filter(f => f !== null);
-
-    console.log(`Ferdig behandlet ${features.length} sykehus-punkter.`);
-    return { type: 'FeatureCollection', features };
-}
- const hospitals = await fetchHospitals();
+    const hospitals = await fetchHospitals();
 
     if (hospitals) {
         dataCache.sykehus = hospitals;
@@ -238,12 +238,12 @@ map.on('load', async () => {
 
 // ─── DEL B: KLIKK-BASERT ROMLIG SPØRRING VIA SUPABASE POSTGIS ───────────────
 let clickModeActive = false;
-let clickMarker     = null;
-let nearbyMarkers   = [];
+let clickMarker = null;
+let nearbyMarkers = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('radius-slider');
-    const label  = document.getElementById('radius-label');
+    const label = document.getElementById('radius-label');
     if (slider) slider.addEventListener('input', () => { label.textContent = slider.value + ' m'; });
 
     const btn = document.getElementById('btn-click-mode');
@@ -260,8 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 map.on('click', async (e) => {
     if (!clickModeActive) return;
-    const lng    = e.lngLat.lng;
-    const lat    = e.lngLat.lat;
+    const lng = e.lngLat.lng;
+    const lat = e.lngLat.lat;
     const radius = parseInt(document.getElementById('radius-slider').value, 10);
     showClickCircle(lng, lat, radius);
     const { data, error } = await supabaseClient.rpc('finn_naerliggende', {
@@ -283,10 +283,14 @@ function showClickCircle(lng, lat, radius) {
         map.getSource('click-circle').setData(circle);
     } else {
         map.addSource('click-circle', { type: 'geojson', data: circle });
-        map.addLayer({ id: 'click-circle-fill', type: 'fill', source: 'click-circle',
-            paint: { 'fill-color': '#7c3aed', 'fill-opacity': 0.12 } });
-        map.addLayer({ id: 'click-circle-outline', type: 'line', source: 'click-circle',
-            paint: { 'line-color': '#7c3aed', 'line-width': 2, 'line-dasharray': [3, 2] } });
+        map.addLayer({
+            id: 'click-circle-fill', type: 'fill', source: 'click-circle',
+            paint: { 'fill-color': '#7c3aed', 'fill-opacity': 0.12 }
+        });
+        map.addLayer({
+            id: 'click-circle-outline', type: 'line', source: 'click-circle',
+            paint: { 'line-color': '#7c3aed', 'line-width': 2, 'line-dasharray': [3, 2] }
+        });
     }
     if (clickMarker) clickMarker.remove();
     const el = document.createElement('div');
@@ -304,17 +308,17 @@ function renderNearbyResults(data) {
         return;
     }
     const colors = { tilfluktsrom: '#FFD700', brannstasjon: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
-    const ikoner  = { tilfluktsrom: '🟡', brannstasjon: '🔴', sykehus: '🟢', drikkevann: '🔵' };
+    const ikoner = { tilfluktsrom: '🟡', brannstasjon: '🔴', sykehus: '🟢', drikkevann: '🔵' };
     data.forEach(item => {
         const el = document.createElement('div');
-        el.style.cssText = `width:13px;height:13px;background:${colors[item.ressurs_type]||'#888'};border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);`;
+        el.style.cssText = `width:13px;height:13px;background:${colors[item.ressurs_type] || '#888'};border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);`;
         nearbyMarkers.push(new maplibregl.Marker({ element: el }).setLngLat([item.lon, item.lat_out]).addTo(map));
     });
     const grouped = {};
     data.forEach(d => { if (!grouped[d.ressurs_type]) grouped[d.ressurs_type] = []; grouped[d.ressurs_type].push(d); });
     let html = `<div style="font-weight:bold;margin-bottom:6px;">📍 ${data.length} resource(s) within ${document.getElementById('radius-slider').value} m:</div>`;
     for (const [type, items] of Object.entries(grouped)) {
-        html += `<div style="margin-top:5px;font-weight:bold;">${ikoner[type]||'📌'} ${type} (${items.length})</div>`;
+        html += `<div style="margin-top:5px;font-weight:bold;">${ikoner[type] || '📌'} ${type} (${items.length})</div>`;
         items.forEach(it => { html += `<div class="nearby-item" style="margin-left:14px;">${it.navn} <span style="color:#888;">– ${Math.round(it.distanse_m)} m</span></div>`; });
     }
     panel.innerHTML = html;
@@ -342,7 +346,7 @@ map.on('click', 'tilfluktsrom-layer', (e) => {
 map.on('click', 'brannstasjoner-layer', (e) => {
     const p = e.features[0].properties;
     const brannstasjon = p.brannstasjon ? `<br><b>Location:</b> ${p.brannstasjon}` : '';
-    const brannvesen = p.brannvesen ? `<br><b>Fire Deptartment:</b> ${p.brannvesen}` : ''; 
+    const brannvesen = p.brannvesen ? `<br><b>Fire Deptartment:</b> ${p.brannvesen}` : '';
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>FIRE STATION</b>${brannstasjon}${brannvesen}`).addTo(map);
 });
 
@@ -351,7 +355,7 @@ map.on('click', 'drikkevann-layer', (e) => {
     const navn = p.name ? `<br><b>Name:</b> ${p.name}` : '';
     const description = p.description ? `<br><b>Description:</b> ${p.description}` : '';
     const operator = p.operator ? `<br><b>Operator:</b> ${p.operator}` : '';
-    const hours= p.opening_hours ? `<br><b>Hours:</b> ${p.opening_hours}` : '';
+    const hours = p.opening_hours ? `<br><b>Hours:</b> ${p.opening_hours}` : '';
     const wheelchair = p.wheelchair ? `<br><b>Wheelchair Access:</b> ${p.wheelchair}` : '';
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>DRINKING WATER</b>${navn}${description}${operator}${hours}${wheelchair}`).addTo(map);
 });
@@ -373,6 +377,44 @@ function setupControls() {
         }, () => alert("Could not find position."));
     });
 
+    // Zoom inn og ut (fra egendefinert 2x2 grid)
+    const btnZoomIn = document.getElementById('btn-zoom-in');
+    if (btnZoomIn) {
+        btnZoomIn.addEventListener('click', () => {
+            map.zoomTo(map.getZoom() + 1, { duration: 250 });
+        });
+    }
+
+    const btnZoomOut = document.getElementById('btn-zoom-out');
+    if (btnZoomOut) {
+        btnZoomOut.addEventListener('click', () => {
+            map.zoomTo(map.getZoom() - 1, { duration: 250 });
+        });
+    }
+
+    // Zoom til land-nivå (Norge)
+    const btnOverview = document.getElementById('btn-overview');
+    if (btnOverview) {
+        btnOverview.addEventListener('click', () => {
+            map.flyTo({
+                center: [15.0, 65.0], // Sirka midt i Norge
+                zoom: 4.5,
+                duration: 1500
+            });
+        });
+    }
+
+    // Finn min posisjon (kart-knapp)
+    const btnLocate = document.getElementById('btn-locate');
+    if (btnLocate) {
+        btnLocate.addEventListener('click', () => {
+            if (!navigator.geolocation) return alert("No GPS support.");
+            navigator.geolocation.getCurrentPosition(pos => {
+                setUserLocation([pos.coords.longitude, pos.coords.latitude]);
+            }, () => alert("Could not find position."));
+        });
+    }
+
     // Search
     const searchBtn = document.getElementById('btn-search');
     const searchInput = document.getElementById('search-input');
@@ -391,7 +433,7 @@ function setupControls() {
 
     // Dropdown & Toggles
     document.getElementById('target-category').addEventListener('change', () => { if (currentPos) calculateRoute(); });
-    
+
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -459,14 +501,14 @@ async function calculateRoute() {
         if (json.routes && json.routes.length > 0) {
             const route = json.routes[0];
             map.getSource('route').setData(route.geometry);
-            
+
             const bounds = new maplibregl.LngLatBounds();
             route.geometry.coordinates.forEach(c => bounds.extend(c));
             map.fitBounds(bounds, { padding: 50 });
 
             document.getElementById('result-area').style.display = 'block';
             document.getElementById('res-info').innerText = `${Math.round(route.duration / 60)} min  /  ${(route.distance / 1000).toFixed(1)} km`;
-            
+
             const destName = props.navn || props.adresse || props.brannstasjon || "Destination";
             document.getElementById('res-dest').innerHTML = `To: <b>${destName}</b>`;
         }
