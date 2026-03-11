@@ -40,7 +40,49 @@
             max-width: calc(100vw - 28px);
             z-index: 1100;
         }
+        #view-mode-toggle {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 1100;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 28px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.14);
+        }
 
+        #view-mode-toggle .view-mode-btn {
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            color: #3c4043;
+            border-radius: 22px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+        }
+
+        #view-mode-toggle .view-mode-btn:hover {
+            background: #f1f3f4;
+            transform: translateY(-1px);
+        }
+
+        #view-mode-toggle .view-mode-btn.active {
+            background: #1a73e8;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.28);
+        }
+
+        #view-mode-toggle .view-mode-btn:disabled {
+            opacity: 0.72;
+            cursor: wait;
+            transform: none;
+        }
         #map-search-overlay .search-box {
             margin-bottom: 0;
             width: 380px;
@@ -349,6 +391,47 @@
             outline-offset: -2px;
             transform: scale(0.95);
         }
+        @media (max-width: 1180px) {
+            #map-search-overlay {
+                flex-wrap: wrap;
+                max-width: calc(100vw - 28px);
+            }
+
+            #layer-chips {
+                max-width: calc(100vw - 28px);
+                overflow-x: auto;
+                padding-bottom: 2px;
+            }
+
+            #view-mode-toggle {
+                top: 132px;
+                right: 14px;
+            }
+
+            #ui-container {
+                top: 194px;
+            }
+        }
+
+        @media (max-width: 780px) {
+            #map-search-overlay {
+                right: 14px;
+            }
+
+            #map-search-overlay .search-box {
+                width: min(100%, 420px);
+            }
+
+            #view-mode-toggle {
+                top: 138px;
+                right: 14px;
+            }
+
+            #ui-container {
+                top: 202px;
+                width: min(320px, calc(100vw - 24px));
+            }
+        }
     </style>
 </head>
 
@@ -392,6 +475,10 @@
         </div>
     </div>
 
+    <div id="view-mode-toggle" aria-label="Map view selector">
+        <button id="btn-view-2d" class="view-mode-btn active" type="button">2D Map</button>
+        <button id="btn-view-3d" class="view-mode-btn" type="button">3D City</button>
+    </div>
     <div id="custom-map-controls">
         <button id="btn-locate" class="map-btn-custom" title="Finn min posisjon">
             <i class="fa-solid fa-crosshairs"></i>
