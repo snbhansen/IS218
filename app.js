@@ -40,10 +40,48 @@ const NORWAY_3D_CAMERA = {
 const MIN_3D_BUILDING_ZOOM = 14.2;
 let currentViewMode = VIEW_MODE.MAP_2D;
 let viewStateBefore3D = null;
-const norway3DBuildingCache = new Map();
+const NORWAY_3D_BUILDING_CACHE_MAX_ENTRIES = 100;
+
+class LruMap {
+    constructor(maxSize) {
+        this._maxSize = typeof maxSize === 'number' && maxSize > 0 ? maxSize : NORWAY_3D_BUILDING_CACHE_MAX_ENTRIES;
+        this._map = new Map();
+    }
+
+    get size() { return this._map.size; }
+
+    has(key) { return this._map.has(key); }
+
+    get(key) {
+        const value = this._map.get(key);
+        if (value === undefined) return undefined;
+        this._map.delete(key);
+        this._map.set(key, value);
+        return value;
+    }
+
+    set(key, value) {
+        if (this._map.has(key)) this._map.delete(key);
+        this._map.set(key, value);
+        if (this._map.size > this._maxSize) {
+            const firstKey = this._map.keys().next().value;
+            if (firstKey !== undefined) this._map.delete(firstKey);
+        }
+        return this;
+    }
+
+    delete(key) { return this._map.delete(key); }
+
+    clear() { this._map.clear(); }
+
+    [Symbol.iterator]() { return this._map[Symbol.iterator](); }
+}
+
+const norway3DBuildingCache = new LruMap(NORWAY_3D_BUILDING_CACHE_MAX_ENTRIES);
 let current3DBuildingAreaKey = null;
 let pending3DBuildingAreaKey = null;
 let norway3DBuildingsPromise = null;
+let currentBuildingFetchController = null;
 let suppress3DBuildingRefresh = false;
 let threeDViewTrackingBound = false;
 // --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
@@ -466,9 +504,10 @@ function convertOverpassBuildingsToGeoJSON(overpassResponse) {
     };
 }
 
-async function fetchOverpassBuildings(endpoint, query) {
+async function fetchOverpassBuildings(endpoint, query, signal) {
     const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal
     });
 
     if (!response.ok) {
@@ -541,6 +580,13 @@ async function loadNorway3DBuildingsForBBox(bbox, cacheKey) {
         return;
     }
 
+    // Abort any previous in-flight fetch so stale results don't overwrite the map.
+    if (currentBuildingFetchController) {
+        currentBuildingFetchController.abort();
+    }
+    const controller = new AbortController();
+    currentBuildingFetchController = controller;
+
     const query = buildOverpassBuildingsQuery(bbox);
     pending3DBuildingAreaKey = cacheKey;
     norway3DBuildingsPromise = (async () => {
@@ -548,7 +594,9 @@ async function loadNorway3DBuildingsForBBox(bbox, cacheKey) {
 
         for (const endpoint of OVERPASS_ENDPOINTS) {
             try {
-                const overpassResponse = await fetchOverpassBuildings(endpoint, query);
+                const overpassResponse = await fetchOverpassBuildings(endpoint, query, controller.signal);
+                // If a newer request has already replaced this controller, discard these results.
+                if (controller.signal.aborted) return;
                 const geojson = convertOverpassBuildingsToGeoJSON(overpassResponse);
                 if (!geojson.features.length) throw new Error('No building footprints returned for this Norway location.');
                 norway3DBuildingCache.set(cacheKey, geojson);
@@ -556,6 +604,7 @@ async function loadNorway3DBuildingsForBBox(bbox, cacheKey) {
                 current3DBuildingAreaKey = cacheKey;
                 return;
             } catch (error) {
+                if (error && error.name === 'AbortError') return;
                 lastError = error;
                 console.warn(`3D city load failed from ${endpoint}:`, error);
             }
@@ -569,6 +618,9 @@ async function loadNorway3DBuildingsForBBox(bbox, cacheKey) {
     } finally {
         norway3DBuildingsPromise = null;
         pending3DBuildingAreaKey = null;
+        if (currentBuildingFetchController === controller) {
+            currentBuildingFetchController = null;
+        }
     }
 }
 
@@ -651,7 +703,18 @@ async function activate3DCityView() {
     } catch (error) {
         viewStateBefore3D = null;
         console.error('Could not activate 3D city view:', error);
-        alert('No 3D city buildings were found for that Norway location yet. Try zooming closer to a town or city and try again.');
+        const errorMessage = (error && error.message) ? String(error.message) : '';
+        let userMessage;
+        if (/No building footprints/i.test(errorMessage)) {
+            userMessage = 'No 3D city buildings were found for that Norway location yet. Try zooming closer to a town or city and try again.';
+        } else if (/NetworkError|Failed to fetch|CORS|network/i.test(errorMessage)) {
+            userMessage = 'Could not load 3D city buildings due to a network error. Please check your internet connection and try again.';
+        } else if (errorMessage) {
+            userMessage = 'Could not activate 3D city view: ' + errorMessage;
+        } else {
+            userMessage = 'Could not activate 3D city view due to an unexpected error. Please try again.';
+        }
+        alert(userMessage);
     } finally {
         updateViewModeToggle(false);
     }
