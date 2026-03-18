@@ -9,6 +9,7 @@ let currentPos = null;
 let transportMode = 'walking';
 let userMarker = null;
 let mapLoaded = false;
+let routeRecalcTimeout = null;
 let dataCache = {
     tilfluktsrom: null,
     brannstasjoner: null,
@@ -926,25 +927,43 @@ function setupControls() {
 
     // Automatic location tracking (watchPosition):
     if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(
-        (pos) => setUserLocation([pos.coords.longitude, pos.coords.latitude]),
-        () => { /* ignore/optional */ },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+        navigator.geolocation.watchPosition(
+            (pos) => setUserLocation([pos.coords.longitude, pos.coords.latitude], { background: true }),
+            () => { /* ignore/optional */ },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
         );
     }
 }
 
 // ROUTING LOGIC
-function setUserLocation(coords) {
+function setUserLocation(coords, options = {}) {
+    const { background = false } = options;
+
     currentPos = coords;
-    map.flyTo(buildViewModeCameraOptions({ center: coords, zoom: 14 }));
+
+    // Only move the camera for non-background (active) updates to avoid jitter.
+    if (!background) {
+        map.flyTo(buildViewModeCameraOptions({ center: coords, zoom: 14 }));
+    }
 
     if (userMarker) userMarker.remove();
     const el = document.createElement('div');
     el.innerHTML = '<i class="fa-solid fa-circle-user" style="color:#2563eb; font-size:35px; background:white; border-radius:50%; box-shadow:0 0 5px rgba(0,0,0,0.3);"></i>';
     userMarker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
 
-    calculateRoute();
+    // For background GPS updates, debounce costly route recalculation.
+    if (background) {
+        const DEBOUNCE_DELAY_MS = 3000;
+        if (routeRecalcTimeout) {
+            clearTimeout(routeRecalcTimeout);
+        }
+        routeRecalcTimeout = setTimeout(() => {
+            calculateRoute();
+        }, DEBOUNCE_DELAY_MS);
+    } else {
+        // Preserve existing behavior for non-background updates.
+        calculateRoute();
+    }
 }
 
 async function calculateRoute() {
