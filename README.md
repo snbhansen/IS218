@@ -64,8 +64,8 @@ Vi bruker MapLibre fordi det er en moderne kartmotor som håndterer interaktive 
 
 -------
 
-### Kort om databehandling og opplasting
-Vi har GeoJSON-filer lokalt i `data/datasett/` (`tilfluktsrom.geojson`, `brannstasjoner.geojson`, `sykehus.geojson` og `drikkevann.geojson`). Scriptet `upload_data.py` brukes til å laste `tilfluktsrom` og `brannstasjoner` inn i Supabase-tabeller, der geometri lagres som punkt (WKT-format: `POINT(lon lat)`) i kolonnen `location`. Sykehusdata (`sykehus.geojson`) og drikkevann (`drikkevann.geojson`) er lastet opp manuelt/separat og lagret i egne tabeller.
+### Databehandling og opplasting av GeoJSON-data til Supabase
+GeoJSON-filene ligger lokalt i `data/datasett/` (`tilfluktsrom.geojson`, `brannstasjoner.geojson`, `sykehus.geojson` og `drikkevann.geojson`). Scriptet `upload_data.py` laster `tilfluktsrom` og `brannstasjoner` inn i Supabase-tabeller, der geometri lagres som punkt (WKT-format: `POINT(lon lat)`) i kolonnen `location`. Sykehusdata (`sykehus.geojson`) og drikkevann (`drikkevann.geojson`) er lastet opp manuelt og lagret i egne tabeller.
 
 
 ## Interaktivitet 
