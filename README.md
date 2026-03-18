@@ -99,7 +99,6 @@ Kartklikk + radius → Supabase RPC (`finn_naerliggende`) → treff i kart + res
 ## Refleksjon 
 
 - **Fra statiske filer til database (Supabase/PostGIS):** Vi startet med lokale GeoJSON-filer, men gikk over til Supabase/PostGIS for å kunne oppdatere og utvide datasett uten å endre frontend-koden hver gang. Dette gjør løsningen mer skalerbar og mer lik hvordan webkart ofte bygges i praksis.
-- **Flere ressurskategorier:** Vi utvidet kartet fra én ressurskategori til flere (tilfluktsrom, brannstasjoner og sykehus) for å gjøre appen mer nyttig i en krisesituasjon og for å teste at samme logikk (lag, popups, lagkontroll og “finn nærmeste”) fungerer på tvers av datakilder.
 - **Flere ressurskategorier:** Vi utvidet kartet fra én ressurskategori til flere (tilfluktsrom, brannstasjoner, sykehus og drikkevann) for å gjøre appen mer nyttig i en krisesituasjon og for å teste at samme logikk (lag, popups, lagkontroll og “finn nærmeste”) fungerer på tvers av datakilder.
 - **Bedre ruting (gange vs bil):** Vi forbedret ruting ved å skille mellom gange og bil. Fotgjengere trenger ruter som kan bruke stier og snarveier, mens bilruter må følge veinettet. Dette gir mer realistiske ruter og tidsestimater.
 - **Mer robust datalesing:** Vi gjorde datalesingen mer robust fordi geometri kan komme i litt ulike formater fra databasen. Målet var å unngå at appen stopper ved små variasjoner i data.
