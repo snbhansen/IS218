@@ -1,8 +1,12 @@
-# Byte-compiled / optimized / DLL files
+/.DS_Store
+node_modules/
+dist/# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
 
+# DB: Passord og div
+.env 
 # C extensions
 *.so
 

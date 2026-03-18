@@ -109,3 +109,105 @@ python3 -m http.server 8000
 **Åpne:**  http://localhost:8000
 
 **Demo-video:** https://drive.google.com/file/d/1_9Z-YgZY2Djvj7SgpeqAw1mw3zZdA9S7/view?usp=sharing
+
+
+------
+
+# Oppgave 2
+
+## Del B – Utvidelse av Webkart (Spatial SQL)
+
+### Beskrivelse av utvidelsen
+
+Vi har utvidet webkartet med et **klikk-basert radius-søk** som bruker **PostGIS via Supabase**.
+Brukeren aktiverer søkemodus ved å trykke "Click map to search", justerer radius (100–2000 m)
+med en slider, og klikker deretter et sted i kartet.
+
+Applikasjonen sender koordinatene til en SQL-funksjon i Supabase som bruker
+`ST_DWithin` og `ST_Distance` til å finne alle beredskapsressurser (tilfluktsrom,
+brannstasjoner og sykehus) innenfor valgt radius. Resultatet vises umiddelbart i kartet
+som fargede markører og i en liste i sidepanelet med navn og avstand.
+
+**Visuell feedback:**
+- Lilla stiplet sirkel rundt klikk-punktet viser søkeradius
+- Klikk-markør (sikte-ikon) markerer der brukeren klikket
+- Fargede prikker (gul/rød/grønn/blå) viser treff på kartet
+- Resultatliste i panelet viser type, navn og avstand i meter
+
+### SQL-snippet – Supabase PostGIS-funksjon
+
+```sql
+DROP FUNCTION IF EXISTS finn_naerliggende(double precision, double precision, integer) CASCADE;
+
+CREATE OR REPLACE FUNCTION finn_naerliggende(
+    klikk_lng double precision,
+    klikk_lat double precision,
+    radius_m  integer DEFAULT 500
+)
+RETURNS TABLE(
+    ressurs_type text,
+    navn         text,
+    distanse_m   double precision,
+    lon          double precision,
+    lat_out      double precision
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+    SELECT
+        'tilfluktsrom'::text,
+        COALESCE(NULLIF(TRIM(navn),''), NULLIF(TRIM(adresse),''), 'Tilfluktsrom')::text,
+        ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography),
+        ST_X(location::geometry),
+        ST_Y(location::geometry)
+    FROM tilfluktsrom
+    WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography, radius_m)
+
+    UNION ALL
+
+    SELECT
+        'brannstasjon'::text,
+        COALESCE(brannstasjon, 'Brannstasjon')::text,
+        ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography),
+        ST_X(location::geometry),
+        ST_Y(location::geometry)
+    FROM brannstasjoner
+    WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography, radius_m)
+
+    UNION ALL
+
+    SELECT
+        'sykehus'::text,
+        COALESCE(name, 'Sykehus')::text,
+        ST_Distance("WKT"::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography),
+        ST_X("WKT"::geometry),
+        ST_Y("WKT"::geometry)
+    FROM sykehus
+    WHERE ST_DWithin("WKT"::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography, radius_m)
+
+    UNION ALL
+
+    SELECT
+        'drikkevann'::text,
+        COALESCE(NULLIF(TRIM(name),''), 'Drikkevann')::text,
+        ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography),
+        ST_X(location::geometry),
+        ST_Y(location::geometry)
+    FROM drikkevann
+    WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(klikk_lng, klikk_lat), 4326)::geography, radius_m)
+
+    ORDER BY 3;
+$$;
+
+GRANT EXECUTE ON FUNCTION finn_naerliggende(double precision, double precision, integer) TO anon;
+```
+
+**PostGIS-funksjoner brukt:**
+
+| Funksjon | Formål |
+|----------|--------|
+| `ST_DWithin` | Filtrer ressurser innenfor radius (meter via geography) |
+| `ST_Distance` | Beregn eksakt avstand i meter fra klikk-punkt |
+| `ST_MakePoint` | Bygg et geometriobjekt fra lon/lat |
+| `ST_SetSRID` | Sett koordinatsystem (WGS84 / EPSG:4326) |
+| `ST_X / ST_Y` | Hent koordinater fra geometri for å plassere markører |
