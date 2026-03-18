@@ -860,18 +860,7 @@ function setupControls() {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
             const coords = [pos.coords.longitude, pos.coords.latitude];
-
-        // Update marker/routing first (this already flyTo's to zoom ~14 in setUserLocation)
-            setUserLocation(coords);
-
-        // Then force your desired zoom so it doesn't get overridden
-            map.flyTo(buildViewModeCameraOptions({
-                center: coords,
-                zoom: 15,
-                duration: 700,
-                essential: true
-            })
-        );
+            setUserLocation(coords, { zoom: 15, duration: 700, essential: true });
             },
             (err) => alert(`Could not find position: ${err.message}`),
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
@@ -935,9 +924,11 @@ function setupControls() {
 }
 
 // ROUTING LOGIC
-function setUserLocation(coords) {
+function setUserLocation(coords, cameraOptions) {
     currentPos = coords;
-    map.flyTo(buildViewModeCameraOptions({ center: coords, zoom: 14 }));
+    if (cameraOptions !== false) {
+        map.flyTo(buildViewModeCameraOptions({ center: coords, zoom: 14, ...cameraOptions }));
+    }
 
     if (userMarker) userMarker.remove();
     const el = document.createElement('div');
