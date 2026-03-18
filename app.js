@@ -853,30 +853,30 @@ function setupControls() {
 
     // Finn min posisjon (kart-knapp)
     const btnLocate = document.getElementById('btn-locate');
-    if (btnLocate) {
-        btnLocate.addEventListener('click', () => {
-            if (!navigator.geolocation) return alert("No GPS support.");
+        if (btnLocate) {
+    btnLocate.addEventListener('click', () => {
+        if (!navigator.geolocation) return alert("No GPS support.");
 
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    const coords = [pos.coords.longitude, pos.coords.latitude];
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+            const coords = [pos.coords.longitude, pos.coords.latitude];
 
-                    // Update marker/routing first (this already flyTo's to zoom ~14 in setUserLocation)
-                    setUserLocation(coords);
+        // Update marker/routing first (this already flyTo's to zoom ~14 in setUserLocation)
+            setUserLocation(coords);
 
-                    // Then force your desired zoom so it doesn't get overridden
-                    map.flyTo(buildViewModeCameraOptions({
-                        center: coords,
-                        zoom: 15,
-                        duration: 700,
-                        essential: true
-                    }));
-                },
-                (err) => alert(`Could not find position: ${err.message}`),
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
-            );
-        });
-    }
+        // Then force your desired zoom so it doesn't get overridden
+            map.flyTo(buildViewModeCameraOptions({
+                center: coords,
+                zoom: 15,
+                duration: 700,
+                essential: true
+            })
+        );
+            },
+            (err) => alert(`Could not find position: ${err.message}`),
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
+        );
+    });
     }
     
 
