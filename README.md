@@ -2,16 +2,17 @@
 Student repository – Group 15
 
 ## Kort Beskrivelse 
-Dette prosjektet er et responsivt webkart (SPA) som hjelper innbyggere i Agder/Kristiansand med å finne nærmeste beredskapsressurs når tid er kritisk. Brukeren kan bruke GPS (“Use my location”) eller søke etter adresse, og appen finner nærmeste tilfluktsrom, brannstasjon eller sykehus. Deretter beregnes rute (bil eller gange), og appen viser estimert tid og avstand.
+Dette prosjektet er et responsivt webkart (SPA) som hjelper innbyggere i Agder/Kristiansand med å finne nærmeste beredskapsressurs når tid er kritisk. Brukeren kan bruke GPS via posisjonsknappen eller søke etter adresse, og appen finner nærmeste drikkevann, tilfluktsrom, brannstasjon eller sykehus. Deretter beregnes rute (bil eller gange), og appen viser estimert tid og avstand. Løsningen er sentrert på Kristiansand/Agder, men enkelte funksjoner som adressesøk og 3D-visning er satt opp for Norge.
 
 
 ## Demo
-- Trykk **“Use my location”** (GPS) eller søk etter adresse (Nominatim).
-- Velg kategori: **Nearest Shelter / Nearest Fire Station / Nearest Hospital**.
+- Trykk på posisjonsknappen nederst til høyre eller søk etter adresse (Nominatim).
+- Velg kategori: **Nearest Drinking Water / Nearest Shelter / Nearest Fire Station / Nearest Hospital**.
 - Appen finner nærmeste punkt med Turf.js og beregner rute med OSRM.
 - Ruten tegnes i kartet, og infoboksen viser reisetid og distanse.
 - Klikk på punkter for å se info i popup.
-- Slå lag av/på i **“View (Layers)”** for å rydde kartet.
+- Slå lag av/på via lagchips øverst i kartet for å rydde kartet.
+- Bytt mellom **2D Map** og **3D City** for å se kartet i ulike visninger.
 
   ------
 
@@ -24,6 +25,7 @@ Dette prosjektet er et responsivt webkart (SPA) som hjelper innbyggere i Agder/K
 - **Romlig analyse:** Turf.js (`nearestPoint`) for å finne nærmeste objekt lokalt i nettleseren
 - **Geokoding:** Nominatim (adresse → koordinater)
 - **Ruting:** OSRM (bil) + routed-foot (gange)
+- **3D-data:** Overpass API for bygningsfotavtrykk i 3D-visning
 
 
   ------
@@ -47,6 +49,10 @@ Vi bruker MapLibre fordi det er en moderne kartmotor som håndterer interaktive 
 - Kilde: Supabase/PostGIS (`sykehus`)
 - Bruk i app: Hentes i `app.js` via egen `fetchHospitals()`-funksjon som henter kolonnene `name`, `phone` og `WKT`. Vises som kartlag + popup. Brukes i "nærmeste".
 
+**Drikkevann**
+- Kilde: Supabase/PostGIS (`drikkevann`)
+- Bruk i app: Hentes i `app.js`, gjøres om til GeoJSON, vises som eget lag + popup. Brukes også i "nærmeste" og i radius-søk.
+
 **Adresse-søk**  
 - Kilde: Nominatim API (OpenStreetMap)  
 - Bruk i app: Adresse → koordinater (lon/lat) som settes som brukerposisjon når GPS ikke brukes.
@@ -59,13 +65,16 @@ Vi bruker MapLibre fordi det er en moderne kartmotor som håndterer interaktive 
 -------
 
 ### Kort om databehandling og opplasting
-Vi har GeoJSON-filer lokalt (`tilfluktsrom.geojson`, `brannstasjoner.geojson` og `sykehus.geojson`). Scriptet `upload_data.py` brukes til å laste `tilfluktsrom` og `brannstasjoner` inn i Supabase-tabeller, der geometri lagres som punkt (WKT-format: `POINT(lon lat)`) i kolonnen `location`. Sykehusdata (`sykehus.geojson`) er lastet opp manuelt/separat og lagret med en `WKT`-kolonne i databasen.
+Vi har GeoJSON-filer lokalt i `data/datasett/` (`tilfluktsrom.geojson`, `brannstasjoner.geojson`, `sykehus.geojson` og `drikkevann.geojson`). Scriptet `upload_data.py` brukes til å laste `tilfluktsrom` og `brannstasjoner` inn i Supabase-tabeller, der geometri lagres som punkt (WKT-format: `POINT(lon lat)`) i kolonnen `location`. Sykehusdata (`sykehus.geojson`) og drikkevann (`drikkevann.geojson`) er lastet opp manuelt/separat og lagret i egne tabeller.
+
 
 ## Interaktivitet 
 - **Popups:** Klikk på punkter for å vise attributter (navn, adresse, telefon osv.).
-- **Lag-separasjon:** Eget kartlag per kategori + rutelag med faste farger (gul, rød, grønn), slik at “data” og “resultat” er tydelig skilt.
-- **Layer control:** Brukeren kan slå lag av/på via checkbokser (tilfluktsrom, brannstasjoner, sykehus).
+- **Lag-separasjon:** Eget kartlag per kategori + rutelag med faste farger (gul, rød, grønn og blå), slik at “data” og “resultat” er tydelig skilt.
+- **Layer control:** Brukeren kan slå lag av/på via klikkbare lagchips øverst i kartet (drikkevann, tilfluktsrom, brannstasjoner, sykehus).
 - **Romlig spørring:** Turf (`nearestPoint`) finner nærmeste objekt fra brukerposisjon, og dette brukes som mål for ruting.
+- **Radius-søk:** Et klikk i kartet kan sende koordinater til Supabase/PostGIS og vise alle ressurser innenfor valgt radius.
+- **Kartvisning:** Egen bryter for 2D-kart og 3D-byvisning.
 
 -------
 
@@ -76,11 +85,13 @@ GPS/adressesøk gir vanligvis koordinater i WGS84 (EPSG:4326) i rekkefølgen `[l
 -------
 
 ## Systemarkitektur / dataflyt
-Vi har valgt en løsning der mest mulig skjer i nettleseren (client-side) for å gjøre appen enkel å kjøre og demonstrere. Når siden lastes, henter `app.js` punktdata fra Supabase/PostGIS. Dataene konverteres til GeoJSON og legges inn som egne lag i MapLibre. Når brukeren velger posisjon (GPS eller adresse), lager vi et Turf “point” og finner nærmeste ressurs i valgt kategori. Deretter sendes start og mål til riktig rutetjeneste (bil eller gange), og vi får tilbake en GeoJSON-linje som tegnes i kartet. Resultatfeltet oppdateres med minutter og kilometer.
+Vi har valgt en løsning der mest mulig skjer i nettleseren (client-side) for å gjøre appen enkel å kjøre og demonstrere. Når siden lastes, henter `app.js` punktdata fra Supabase/PostGIS. Dataene konverteres til GeoJSON og legges inn som egne lag i MapLibre. Når brukeren velger posisjon (GPS eller adresse), lager vi et Turf “point” og finner nærmeste ressurs i valgt kategori. Deretter sendes start og mål til riktig rutetjeneste (bil eller gange), og vi får tilbake en GeoJSON-linje som tegnes i kartet. Resultatfeltet oppdateres med minutter og kilometer. I tillegg kan brukeren aktivere et radius-søk som sender klikkpunkt og radius til en SQL-funksjon i Supabase, og 3D-visningen henter bygningsdata dynamisk fra Overpass API.
 
 ```text
 Supabase/PostGIS → app.js → GeoJSON → MapLibre (lag + popups + toggles)
 GPS/Adresse → Turf (nærmeste) → OSRM (rute) → rutelag + tid/avstand
+Kartklikk + radius → Supabase RPC (`finn_naerliggende`) → treff i kart + resultatliste
+3D-visning → Overpass API → bygningsfotavtrykk → MapLibre fill-extrusion
 ```
 
 -------
@@ -88,7 +99,7 @@ GPS/Adresse → Turf (nærmeste) → OSRM (rute) → rutelag + tid/avstand
 ## Refleksjon 
 
 - **Fra statiske filer til database (Supabase/PostGIS):** Vi startet med lokale GeoJSON-filer, men gikk over til Supabase/PostGIS for å kunne oppdatere og utvide datasett uten å endre frontend-koden hver gang. Dette gjør løsningen mer skalerbar og mer lik hvordan webkart ofte bygges i praksis.
-- **Flere ressurskategorier:** Vi utvidet kartet fra én ressurskategori til flere (tilfluktsrom, brannstasjoner og sykehus) for å gjøre appen mer nyttig i en krisesituasjon og for å teste at samme logikk (lag, popups, lagkontroll og “finn nærmeste”) fungerer på tvers av datakilder.
+- **Flere ressurskategorier:** Vi utvidet kartet fra én ressurskategori til flere (tilfluktsrom, brannstasjoner, sykehus og drikkevann) for å gjøre appen mer nyttig i en krisesituasjon og for å teste at samme logikk (lag, popups, lagkontroll og “finn nærmeste”) fungerer på tvers av datakilder.
 - **Bedre ruting (gange vs bil):** Vi forbedret ruting ved å skille mellom gange og bil. Fotgjengere trenger ruter som kan bruke stier og snarveier, mens bilruter må følge veinettet. Dette gir mer realistiske ruter og tidsestimater.
 - **Mer robust datalesing:** Vi gjorde datalesingen mer robust fordi geometri kan komme i litt ulike formater fra databasen. Målet var å unngå at appen stopper ved små variasjoner i data.
 - **Bedre UI for mobil/feltbruk:** Vi forbedret UI med tydelig resultatboks og lagvalg, slik at kartet blir mindre “rotete” når flere lag vises samtidig.
@@ -125,7 +136,7 @@ med en slider, og klikker deretter et sted i kartet.
 
 Applikasjonen sender koordinatene til en SQL-funksjon i Supabase som bruker
 `ST_DWithin` og `ST_Distance` til å finne alle beredskapsressurser (tilfluktsrom,
-brannstasjoner og sykehus) innenfor valgt radius. Resultatet vises umiddelbart i kartet
+brannstasjoner, sykehus og drikkevann) innenfor valgt radius. Resultatet vises umiddelbart i kartet
 som fargede markører og i en liste i sidepanelet med navn og avstand.
 
 **Visuell feedback:**
@@ -211,3 +222,10 @@ GRANT EXECUTE ON FUNCTION finn_naerliggende(double precision, double precision, 
 | `ST_MakePoint` | Bygg et geometriobjekt fra lon/lat |
 | `ST_SetSRID` | Sett koordinatsystem (WGS84 / EPSG:4326) |
 | `ST_X / ST_Y` | Hent koordinater fra geometri for å plassere markører |
+
+## Andre filer i repoet
+
+- `analyse.ipynb`: Notebook for analysearbeid og databasekobling med GeoPandas/Folium. Denne brukes ikke av selve webappen.
+- `data/datasett/agder_grense.geojson` og `data/datasett/agder_kommuner.geojson`: Støttefiler for geografisk avgrensning og analyse.
+- `data/vektordata/overlayanalyse.gpkg` og `data/vektordata/bratt_terreng_vektor.gpkg`: GIS-resultater fra analysearbeid.
+- `data/raster/`: Rasterfiler (`bratt_terreng.tif`, `hoydedata.tif`, `hillshade1.tif`, `hillshade2.tif`) brukt i analysearbeid, ikke direkte i frontend.

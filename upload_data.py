@@ -9,7 +9,7 @@ KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indx
 supabase: Client = create_client(URL, KEY)
 
 def upload_data(filename, table_name, mapping_func):
-    filepath = f'data/{filename}'
+    filepath = f'data/datasett/{filename}'
     if not os.path.exists(filepath):
         print(f"⚠️ Finner ikke {filepath}")
         return
