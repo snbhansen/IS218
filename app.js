@@ -162,14 +162,14 @@ map.on('load', async () => {
     // Satelittlag — legges til FØRST slik at de alltid ligger under alle andre lag
     map.addSource('sentinel2-source', {
         type: 'raster',
-        tiles: ['https://wms.geonorge.no/skwms1/wms.sentinel2?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256'],
+        tiles: ['https://wms.geonorge.no/skwms1/wms.sentinel2?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=2025'],
         tileSize: 256
     });
     map.addLayer({ id: 'sentinel2-layer', type: 'raster', source: 'sentinel2-source', layout: { visibility: 'none' } });
 
     map.addSource('ortofoto-source', {
         type: 'raster',
-        tiles: ['https://wms.geonorge.no/skwms1/wms.nib?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256'],
+        tiles: ['https://wms.geonorge.no/skwms1/wms.nib?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=norgeibilder'],
         tileSize: 256
     });
     map.addLayer({ id: 'ortofoto-layer', type: 'raster', source: 'ortofoto-source', layout: { visibility: 'none' } });
