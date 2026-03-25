@@ -360,7 +360,14 @@ map.on('load', async () => {
         Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
             map.setLayoutProperty(layerId, 'visibility', k === key ? 'visible' : 'none');
         });
+        document.querySelectorAll('#basemap-selector .basemap-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.basemap === key);
+        });
     }
+
+    document.querySelectorAll('#basemap-selector .basemap-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchBaseMap(btn.dataset.basemap));
+    });
 
     setupControls();
 });
