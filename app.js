@@ -133,7 +133,7 @@ const mapStyle = {
             'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
             'tileSize': 256,
             'attribution': '&copy; OpenStreetMap Contributors'
-        }
+        },
     },
     'layers': [{
         'id': 'osm-layer',
@@ -158,6 +158,14 @@ try {
 map.on('load', async () => {
     console.log("Map loaded. Fetching data from Supabase...");
     mapLoaded = true;
+
+    // Satelittlag — legges til FØRST slik at de alltid ligger under alle andre lag
+    map.addSource('sentinel2-source', {
+        type: 'raster',
+        tiles: ['https://wms.geonorge.no/skwms1/wms.sentinel2?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256'],
+        tileSize: 256
+    });
+    map.addLayer({ id: 'sentinel2-layer', type: 'raster', source: 'sentinel2-source', layout: { visibility: 'none' } });
 
     // Prøv å laste ikon
     let iconLoaded = false;
@@ -262,6 +270,23 @@ map.on('load', async () => {
         source: 'route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.8 }
+    });
+
+    // Satellitt-toggle-logikk med zoom-basert bytte
+    let satelliteActive = false;
+
+    function updateSatelliteLayers() {
+        if (!satelliteActive) {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
+            return;
+        }
+        map.setLayoutProperty('sentinel2-layer', 'visibility', 'visible');
+    }
+
+    document.getElementById('toggle-satellite').addEventListener('click', () => {
+        satelliteActive = !satelliteActive;
+        updateSatelliteLayers();
+        document.getElementById('toggle-satellite').textContent = satelliteActive ? 'Normal map' : 'Satellite';
     });
 
     setupControls();

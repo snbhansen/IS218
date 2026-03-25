@@ -391,6 +391,29 @@
             outline-offset: -2px;
             transform: scale(0.95);
         }
+        /* ── Satelitt-toggle-knapp ── */
+        #toggle-satellite {
+            position: absolute;
+            top: 76px;
+            right: 14px;
+            z-index: 1100;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 22px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.14);
+            font-size: 14px;
+            font-weight: 700;
+            color: #3c4043;
+            border: none;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+
+        #toggle-satellite:hover {
+            background: #f1f3f4;
+            transform: translateY(-1px);
+        }
+
         @media (max-width: 1180px) {
             #map-search-overlay {
                 flex-wrap: wrap;
@@ -406,6 +429,10 @@
             #view-mode-toggle {
                 top: 132px;
                 right: 14px;
+            }
+
+            #toggle-satellite {
+                top: 195px;
             }
 
             #ui-container {
@@ -425,6 +452,10 @@
             #view-mode-toggle {
                 top: 138px;
                 right: 14px;
+            }
+
+            #toggle-satellite {
+                top: 202px;
             }
 
             #ui-container {
@@ -479,7 +510,8 @@
         <button id="btn-view-2d" class="view-mode-btn active" type="button">2D Map</button>
         <button id="btn-view-3d" class="view-mode-btn" type="button">3D City</button>
     </div>
-    <div id="custom-map-controls">
+    <button id="toggle-satellite" type="button">Satellite</button>
+        <div id="custom-map-controls">
         <button id="btn-locate" class="map-btn-custom" title="Finn min posisjon">
             <i class="fa-solid fa-crosshairs"></i>
         </button>
@@ -540,6 +572,7 @@
     </div>
 
     <script src="./app.js"></script>
+
 </body>
 
 </html>
