@@ -167,6 +167,13 @@ map.on('load', async () => {
     });
     map.addLayer({ id: 'sentinel2-layer', type: 'raster', source: 'sentinel2-source', layout: { visibility: 'none' } });
 
+    map.addSource('ortofoto-source', {
+        type: 'raster',
+        tiles: ['https://wms.geonorge.no/skwms1/wms.nib?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256'],
+        tileSize: 256
+    });
+    map.addLayer({ id: 'ortofoto-layer', type: 'raster', source: 'ortofoto-source', layout: { visibility: 'none' } });
+
     // Prøv å laste ikon
     let iconLoaded = false;
     try { await loadTilfluktsromIcon(map); iconLoaded = true; } catch (e) { }
@@ -278,9 +285,16 @@ map.on('load', async () => {
     function updateSatelliteLayers() {
         if (!satelliteActive) {
             map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
             return;
         }
-        map.setLayoutProperty('sentinel2-layer', 'visibility', 'visible');
+        if (map.getZoom() >= 14) {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'visible');
+        } else {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'visible');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
+        }
     }
 
     document.getElementById('toggle-satellite').addEventListener('click', () => {
@@ -288,6 +302,8 @@ map.on('load', async () => {
         updateSatelliteLayers();
         document.getElementById('toggle-satellite').textContent = satelliteActive ? 'Normal map' : 'Satellite';
     });
+
+    map.on('zoom', updateSatelliteLayers);
 
     setupControls();
 });
