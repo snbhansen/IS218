@@ -133,14 +133,55 @@ const mapStyle = {
             'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
             'tileSize': 256,
             'attribution': '&copy; OpenStreetMap Contributors'
+        },
+        'kartverket-topo': {
+            'type': 'raster',
+            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
+            'tileSize': 256,
+            'attribution': '&copy; Kartverket'
+        },
+        'kartverket-farger': {
+            'type': 'raster',
+            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
+            'tileSize': 256,
+            'attribution': '&copy; Kartverket'
+        },
+        'kartverket-graatone': {
+            'type': 'raster',
+            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
+            'tileSize': 256,
+            'attribution': '&copy; Kartverket'
         }
     },
-    'layers': [{
-        'id': 'osm-layer',
-        'type': 'raster',
-        'source': 'osm',
-        'minzoom': 0, 'maxzoom': 19
-    }]
+    'layers': [
+        {
+            'id': 'osm-layer',
+            'type': 'raster',
+            'source': 'osm',
+            'minzoom': 0, 'maxzoom': 19
+        },
+        {
+            'id': 'kartverket-topo-layer',
+            'type': 'raster',
+            'source': 'kartverket-topo',
+            'minzoom': 0, 'maxzoom': 20,
+            'layout': { 'visibility': 'none' }
+        },
+        {
+            'id': 'kartverket-farger-layer',
+            'type': 'raster',
+            'source': 'kartverket-farger',
+            'minzoom': 0, 'maxzoom': 20,
+            'layout': { 'visibility': 'none' }
+        },
+        {
+            'id': 'kartverket-graatone-layer',
+            'type': 'raster',
+            'source': 'kartverket-graatone',
+            'minzoom': 0, 'maxzoom': 20,
+            'layout': { 'visibility': 'none' }
+        }
+    ]
 };
 
 try {
@@ -158,6 +199,21 @@ try {
 map.on('load', async () => {
     console.log("Map loaded. Fetching data from Supabase...");
     mapLoaded = true;
+
+    // Satelittlag — legges til FØRST slik at de alltid ligger under alle andre lag
+    map.addSource('sentinel2-source', {
+        type: 'raster',
+        tiles: ['https://wms.geonorge.no/skwms1/wms.sentinel2?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=2025'],
+        tileSize: 256
+    });
+    map.addLayer({ id: 'sentinel2-layer', type: 'raster', source: 'sentinel2-source', layout: { visibility: 'none' } });
+
+    map.addSource('ortofoto-source', {
+        type: 'raster',
+        tiles: ['https://wms.geonorge.no/skwms1/wms.nib?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=norgeibilder'],
+        tileSize: 256
+    });
+    map.addLayer({ id: 'ortofoto-layer', type: 'raster', source: 'ortofoto-source', layout: { visibility: 'none' } });
 
     // Prøv å laste ikon
     let iconLoaded = false;
@@ -262,6 +318,55 @@ map.on('load', async () => {
         source: 'route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.8 }
+    });
+
+    // Satellitt-toggle-logikk med zoom-basert bytte
+    let satelliteActive = false;
+
+    function updateSatelliteLayers() {
+        if (!satelliteActive) {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
+            return;
+        }
+        if (map.getZoom() >= 14) {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'visible');
+        } else {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'visible');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
+        }
+    }
+
+    document.getElementById('toggle-satellite').addEventListener('click', () => {
+        satelliteActive = !satelliteActive;
+        updateSatelliteLayers();
+        document.getElementById('toggle-satellite').textContent = satelliteActive ? 'Normal map' : 'Satellite';
+    });
+
+    map.on('zoom', updateSatelliteLayers);
+
+    // Base map switcher
+    const BASE_LAYERS = {
+        'osm':      'osm-layer',
+        'raster':   'kartverket-topo-layer',
+        'farger':   'kartverket-farger-layer',
+        'graatone': 'kartverket-graatone-layer'
+    };
+    let activeBaseMap = 'osm';
+
+    function switchBaseMap(key) {
+        activeBaseMap = key;
+        Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
+            map.setLayoutProperty(layerId, 'visibility', k === key ? 'visible' : 'none');
+        });
+        document.querySelectorAll('#basemap-selector .basemap-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.basemap === key);
+        });
+    }
+
+    document.querySelectorAll('#basemap-selector .basemap-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchBaseMap(btn.dataset.basemap));
     });
 
     setupControls();
