@@ -631,24 +631,24 @@
     <button id="toggle-satellite" type="button">Satellite</button>
     <div id="basemap-selector" aria-label="Velg kartunderlag">
         <button id="basemap-trigger" type="button" title="Velg kartunderlag">
-            <img id="basemap-thumb" src="https://a.tile.openstreetmap.org/0/0/0.png" alt="Kartunderlag">
+            <img id="basemap-thumb" src="https://a.tile.openstreetmap.org/7/67/37.png" alt="Kartunderlag">
             <span id="basemap-trigger-label"><i class="fa-solid fa-layer-group"></i> Layers</span>
         </button>
         <div id="basemap-panel">
             <button class="basemap-btn active" data-basemap="osm" type="button">
-                <div class="basemap-card"><img src="https://a.tile.openstreetmap.org/0/0/0.png" alt="OSM"></div>
+                <div class="basemap-card"><img src="https://a.tile.openstreetmap.org/7/67/37.png" alt="OSM"></div>
                 <span class="basemap-card-label">OSM</span>
             </button>
             <button class="basemap-btn" data-basemap="raster" type="button">
-                <div class="basemap-card"><img src="https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/0/0/0.png" alt="Farger"></div>
+                <div class="basemap-card"><img src="https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/7/37/67.png" alt="Farger"></div>
                 <span class="basemap-card-label">Farger</span>
             </button>
             <button class="basemap-btn" data-basemap="farger" type="button">
-                <div class="basemap-card"><img src="https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/0/0/0.png" alt="Gråtoner"></div>
+                <div class="basemap-card"><img src="https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/7/37/67.png" alt="Gråtoner"></div>
                 <span class="basemap-card-label">Gråtoner</span>
             </button>
             <button class="basemap-btn" data-basemap="graatone" type="button">
-                <div class="basemap-card"><img src="https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/0/0/0.png" alt="Raster"></div>
+                <div class="basemap-card"><img src="https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/7/37/67.png" alt="Raster"></div>
                 <span class="basemap-card-label">Raster</span>
             </button>
         </div>
@@ -717,10 +717,10 @@
     <script>
         (function () {
             const BASEMAP_THUMBS = {
-                osm:      'https://a.tile.openstreetmap.org/0/0/0.png',
-                raster:   'https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/0/0/0.png',
-                farger:   'https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/0/0/0.png',
-                graatone: 'https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/0/0/0.png'
+                osm:      'https://a.tile.openstreetmap.org/7/67/37.png',
+                raster:   'https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/7/37/67.png',
+                farger:   'https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/7/37/67.png',
+                graatone: 'https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/7/37/67.png'
             };
             document.getElementById('basemap-selector').addEventListener('click', function (e) {
                 const btn = e.target.closest('.basemap-btn');
