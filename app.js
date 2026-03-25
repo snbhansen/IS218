@@ -134,13 +134,54 @@ const mapStyle = {
             'tileSize': 256,
             'attribution': '&copy; OpenStreetMap Contributors'
         },
+        'kartverket-topo': {
+            'type': 'raster',
+            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
+            'tileSize': 256,
+            'attribution': '&copy; Kartverket'
+        },
+        'kartverket-farger': {
+            'type': 'raster',
+            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
+            'tileSize': 256,
+            'attribution': '&copy; Kartverket'
+        },
+        'kartverket-graatone': {
+            'type': 'raster',
+            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
+            'tileSize': 256,
+            'attribution': '&copy; Kartverket'
+        }
     },
-    'layers': [{
-        'id': 'osm-layer',
-        'type': 'raster',
-        'source': 'osm',
-        'minzoom': 0, 'maxzoom': 19
-    }]
+    'layers': [
+        {
+            'id': 'osm-layer',
+            'type': 'raster',
+            'source': 'osm',
+            'minzoom': 0, 'maxzoom': 19
+        },
+        {
+            'id': 'kartverket-topo-layer',
+            'type': 'raster',
+            'source': 'kartverket-topo',
+            'minzoom': 0, 'maxzoom': 20,
+            'layout': { 'visibility': 'none' }
+        },
+        {
+            'id': 'kartverket-farger-layer',
+            'type': 'raster',
+            'source': 'kartverket-farger',
+            'minzoom': 0, 'maxzoom': 20,
+            'layout': { 'visibility': 'none' }
+        },
+        {
+            'id': 'kartverket-graatone-layer',
+            'type': 'raster',
+            'source': 'kartverket-graatone',
+            'minzoom': 0, 'maxzoom': 20,
+            'layout': { 'visibility': 'none' }
+        }
+    ]
 };
 
 try {
@@ -304,6 +345,22 @@ map.on('load', async () => {
     });
 
     map.on('zoom', updateSatelliteLayers);
+
+    // Base map switcher
+    const BASE_LAYERS = {
+        'osm':      'osm-layer',
+        'raster':   'kartverket-topo-layer',
+        'farger':   'kartverket-farger-layer',
+        'graatone': 'kartverket-graatone-layer'
+    };
+    let activeBaseMap = 'osm';
+
+    function switchBaseMap(key) {
+        activeBaseMap = key;
+        Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
+            map.setLayoutProperty(layerId, 'visibility', k === key ? 'visible' : 'none');
+        });
+    }
 
     setupControls();
 });
