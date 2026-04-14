@@ -1,4 +1,4 @@
-// --- TRANSLATIONS ---
+﻿// --- TRANSLATIONS ---
 const TRANSLATIONS = {
     en: {
         searchPlaceholder: 'Search address...',
@@ -220,6 +220,148 @@ let dataCache = {
     drikkevann: null,
     sykehus: null
 };
+const LOCAL_DATA_PATHS = {
+    tilfluktsrom: './data/datasett/tilfluktsrom.geojson',
+    brannstasjoner: './data/datasett/brannstasjoner.geojson',
+    drikkevann: './data/datasett/drikkevann.geojson',
+    sykehus: './data/datasett/sykehus.geojson'
+};
+const OFFLINE_ROUTE_SPEED_KMH = {
+    walking: 5,
+    driving: 50
+};
+const OFFLINE_REQUIRED_ASSETS = [
+    '/index.html',
+    '/app.js',
+    '/manifest.webmanifest',
+    '/icons/pwa-icon.svg',
+    '/data/datasett/tilfluktsrom.geojson',
+    '/data/datasett/brannstasjoner.geojson',
+    '/data/datasett/drikkevann.geojson',
+    '/data/datasett/sykehus.geojson'
+];
+let usesCachedData = false;
+
+function showStatusMessage(message, type = 'info', ttlMs = 0) {
+    const el = document.getElementById('status-message');
+    if (!el) return;
+
+    el.textContent = message;
+    el.style.display = 'block';
+    el.style.borderColor = type === 'error' ? '#ef4444' : type === 'warn' ? '#f59e0b' : '#d1d5db';
+
+    if (ttlMs > 0) {
+        window.setTimeout(() => {
+            if (el.textContent === message) el.style.display = 'none';
+        }, ttlMs);
+    }
+}
+
+function updateOfflineIndicator() {
+    const indicator = document.getElementById('offline-indicator');
+    if (!indicator) return;
+
+    const online = navigator.onLine;
+    indicator.className = `status-pill ${online ? 'online' : 'offline'}`;
+    indicator.textContent = online ? 'Online' : 'Offline mode';
+
+    if (!online) {
+        showStatusMessage('Offline mode active: using cached/local emergency data. Search, live routing, and 3D overpass data are unavailable.', 'warn');
+    }
+}
+
+function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', async () => {
+        try {
+            await navigator.serviceWorker.register('./service-worker.js');
+        } catch (error) {
+            console.warn('Service worker registration failed:', error);
+        }
+    });
+}
+
+async function runOfflineReadinessCheck() {
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+        showStatusMessage('Offline check unavailable in this browser.', 'warn', 5000);
+        return;
+    }
+
+    try {
+        const registration = await navigator.serviceWorker.getRegistration('./');
+        if (!registration) {
+            showStatusMessage('Service worker is not registered yet. Open once online and refresh.', 'warn');
+            return;
+        }
+
+        const missingAssets = [];
+        for (const assetPath of OFFLINE_REQUIRED_ASSETS) {
+            const url = new URL(assetPath, window.location.origin).href;
+            const match = await caches.match(url);
+            if (!match) missingAssets.push(assetPath);
+        }
+
+        if (missingAssets.length === 0) {
+            showStatusMessage('Offline readiness OK: app shell and emergency datasets are cached.', 'info');
+        } else {
+            const shortList = missingAssets.slice(0, 4).join(', ');
+            const suffix = missingAssets.length > 4 ? '...' : '';
+            showStatusMessage(`Offline not fully ready. Missing ${missingAssets.length} assets: ${shortList}${suffix}`, 'warn');
+        }
+    } catch (error) {
+        console.error('Offline readiness check failed:', error);
+        showStatusMessage('Offline readiness check failed. See console for details.', 'error', 6000);
+    }
+}
+
+function normalizeGeoJSONToPoints(featureCollection, tableName) {
+    if (!featureCollection || !Array.isArray(featureCollection.features)) {
+        return { type: 'FeatureCollection', features: [] };
+    }
+
+    const features = featureCollection.features.map((feature, idx) => {
+        if (!feature || !feature.geometry) return null;
+
+        let geometry = feature.geometry;
+        if (geometry.type !== 'Point') {
+            try {
+                geometry = turf.pointOnFeature(feature).geometry;
+            } catch {
+                return null;
+            }
+        }
+
+        const properties = feature.properties || {};
+        const defaultName = tableName === 'sykehus' ? 'Hospital' : tableName === 'brannstasjoner' ? 'Fire Station' : tableName === 'drikkevann' ? 'Drinking Water' : 'Shelter';
+        const navn = properties.navn || properties.name || properties.adresse || properties.brannstasjon || `${defaultName} ${idx + 1}`;
+
+        return {
+            type: 'Feature',
+            geometry,
+            properties: {
+                ...properties,
+                navn,
+                name: properties.name || properties.navn || null
+            }
+        };
+    }).filter(Boolean);
+
+    return { type: 'FeatureCollection', features };
+}
+
+async function fetchLocalGeoJSON(tableName) {
+    const localPath = LOCAL_DATA_PATHS[tableName];
+    if (!localPath) return null;
+
+    const response = await fetch(localPath);
+    if (!response.ok) throw new Error(`Could not load local dataset for ${tableName}`);
+    const data = await response.json();
+    return normalizeGeoJSONToPoints(data, tableName);
+}
+const VIEW_MODE = {
+    MAP_2D: '2d',
+    CITY_3D: '3d'
+};
 const NORWAY_3D_SOURCE_ID = 'norway-3d-buildings-source';
 const NORWAY_3D_LAYER_ID = 'norway-3d-buildings-layer';
 const NORWAY_3D_FOOTPRINT_LAYER_ID = 'norway-3d-footprints-layer';
@@ -253,6 +395,18 @@ let threeDViewTrackingBound = false;
 async function fetchGeoJSON(tableName) {
     console.log(`Henter data fra tabell: ${tableName}...`);
 
+    if (!navigator.onLine) {
+        try {
+            const localData = await fetchLocalGeoJSON(tableName);
+            usesCachedData = true;
+            showStatusMessage(`Offline: using local ${tableName} dataset.`, 'warn', 5000);
+            return localData;
+        } catch (localError) {
+            console.error(`Kunne ikke laste lokaldata for ${tableName}:`, localError);
+            return null;
+        }
+    }
+
     // Vi henter alt data som det er
     const { data, error } = await supabaseClient
         .from(tableName)
@@ -260,7 +414,15 @@ async function fetchGeoJSON(tableName) {
 
     if (error) {
         console.error(`Feil fra Supabase (${tableName}):`, error);
-        return null;
+        try {
+            const localData = await fetchLocalGeoJSON(tableName);
+            usesCachedData = true;
+            showStatusMessage(`Network issue: falling back to local ${tableName} data.`, 'warn', 6000);
+            return localData;
+        } catch (localError) {
+            console.error(`Kunne ikke laste lokal fallback for ${tableName}:`, localError);
+            return null;
+        }
     }
 
     const features = data.map(row => {
@@ -324,7 +486,7 @@ async function fetchGeoJSON(tableName) {
     }).filter(f => f !== null);
 
     console.log(`Ferdig behandlet ${features.length} punkter for ${tableName}.`);
-    return { type: 'FeatureCollection', features: features };
+    return normalizeGeoJSONToPoints({ type: 'FeatureCollection', features }, tableName);
 }
 
 // MAP SETUP
@@ -362,6 +524,11 @@ const mapStyle = {
     },
     'layers': [
         {
+            'id': 'fallback-background',
+            'type': 'background',
+            'paint': { 'background-color': '#e5e7eb' }
+        },
+        {
             'id': 'osm-layer',
             'type': 'raster',
             'source': 'osm'
@@ -397,6 +564,13 @@ try {
     });
     // Standard navigation control (zoom in/out) er fjernet herfra for å gi plass til vår custom 2x2 grid.
 } catch (err) { console.error("Map error:", err); }
+
+map.on('error', (event) => {
+    const sourceId = event && event.sourceId ? event.sourceId : '';
+    if (sourceId === 'osm') {
+        showStatusMessage('Basemap tiles are unavailable. Emergency layers remain available.', 'warn', 7000);
+    }
+});
 
 // DATA LOADING
 map.on('load', async () => {
@@ -475,36 +649,8 @@ map.on('load', async () => {
         });
     }
 
-    // 4. Hent Sykehuser
-    // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
-    async function fetchHospitals() {
-        console.log("Henter data fra sykehus...");
-        const { data, error } = await supabaseClient
-            .from('sykehus')
-            .select('name, phone, WKT');
-
-        if (error) {
-            console.error("Feil fra Supabase (sykehus):", error);
-            return null;
-        }
-
-        const features = data.map(row => {
-            if (!row.WKT || row.WKT.type !== 'Point') return null;
-
-            return {
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: row.WKT.coordinates },
-                properties: {
-                    name: row.name,
-                    phone: row.phone || null
-                }
-            };
-        }).filter(f => f !== null);
-
-        console.log(`Ferdig behandlet ${features.length} sykehus-punkter.`);
-        return { type: 'FeatureCollection', features };
-    }
-    const hospitals = await fetchHospitals();
+    // 4. Hent Sykehus
+    const hospitals = await fetchGeoJSON('sykehus');
 
     if (hospitals) {
         dataCache.sykehus = hospitals;
@@ -610,6 +756,10 @@ map.on('load', async () => {
         tileSize: 256,
         encoding: 'terrarium'
     });
+
+    if (usesCachedData) {
+        showStatusMessage('Running with cached/local emergency data. Some online services are limited.', 'warn');
+    }
 
     setupControls();
     setTimeout(function () { if (typeof startInfoBarSync === 'function') startInfoBarSync(); }, 400);
@@ -985,6 +1135,11 @@ async function toggle3DCityView() {
         return;
     }
 
+    if (!navigator.onLine) {
+        showStatusMessage('3D city buildings require internet (Overpass API).', 'warn', 6000);
+        return;
+    }
+
     const targetCenter = get3DActivationCenter();
     if (!targetCenter) {
         alert('Zoom or search to a location in Norway before opening the 3D city view.');
@@ -1111,9 +1266,26 @@ let pinpointPopup = null;
 let destinationMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    registerServiceWorker();
+    updateOfflineIndicator();
+    window.addEventListener('online', () => {
+        updateOfflineIndicator();
+        showStatusMessage('Connection restored. Live services are available again.', 'info', 4000);
+    });
+    window.addEventListener('offline', () => {
+        updateOfflineIndicator();
+    });
+
     const slider = document.getElementById('radius-slider');
     const label = document.getElementById('radius-label');
     if (slider) slider.addEventListener('input', () => { label.textContent = slider.value + ' m'; });
+
+    const offlineCheckBtn = document.getElementById('btn-offline-check');
+    if (offlineCheckBtn) {
+        offlineCheckBtn.addEventListener('click', () => {
+            runOfflineReadinessCheck();
+        });
+    }
 
     const btn = document.getElementById('btn-click-mode');
     if (btn) btn.addEventListener('click', () => {
@@ -1138,18 +1310,61 @@ map.on('click', async (e) => {
     const lat = e.lngLat.lat;
     const radius = parseInt(document.getElementById('radius-slider').value, 10);
     showClickCircle(lng, lat, radius);
+
+    if (!navigator.onLine) {
+        const localResults = findNearbyLocalResources(lng, lat, radius);
+        showStatusMessage('Offline: radius results are computed from cached emergency data.', 'warn', 5000);
+        renderNearbyResults(localResults);
+        return;
+    }
+
     const { data, error } = await supabaseClient.rpc('finn_naerliggende', {
         klikk_lng: lng, klikk_lat: lat, radius_m: radius
     });
     if (error) {
         console.error('Supabase RPC-feil:', error);
-        const panel = document.getElementById('nearby-results');
-        panel.style.display = 'block';
-        panel.innerHTML = '<span style="color:red;">Feil ved romlig spørring. Sjekk konsollen.</span>';
+        const localResults = findNearbyLocalResources(lng, lat, radius);
+        showStatusMessage('Live spatial query failed. Showing local cached results instead.', 'warn', 6000);
+        renderNearbyResults(localResults);
         return;
     }
     renderNearbyResults(data);
 });
+
+function findNearbyLocalResources(lng, lat, radiusMeters) {
+    const origin = turf.point([lng, lat]);
+    const groups = [
+        { key: 'tilfluktsrom', type: 'tilfluktsrom' },
+        { key: 'brannstasjoner', type: 'brannstasjon' },
+        { key: 'sykehus', type: 'sykehus' },
+        { key: 'drikkevann', type: 'drikkevann' }
+    ];
+
+    const results = [];
+    groups.forEach(({ key, type }) => {
+        const fc = dataCache[key];
+        if (!fc || !Array.isArray(fc.features)) return;
+
+        fc.features.forEach((feature) => {
+            if (!feature || !feature.geometry || feature.geometry.type !== 'Point') return;
+            const coords = feature.geometry.coordinates;
+            const distanceKm = turf.distance(origin, turf.point(coords), { units: 'kilometers' });
+            const distanceMeters = distanceKm * 1000;
+            if (distanceMeters > radiusMeters) return;
+
+            const p = feature.properties || {};
+            results.push({
+                ressurs_type: type,
+                navn: p.navn || p.name || p.adresse || p.brannstasjon || 'Unknown',
+                distanse_m: distanceMeters,
+                lon: coords[0],
+                lat_out: coords[1]
+            });
+        });
+    });
+
+    return results.sort((a, b) => a.distanse_m - b.distanse_m);
+}
 
 function showClickCircle(lng, lat, radius) {
     const circle = turf.circle([lng, lat], radius / 1000, { steps: 64, units: 'kilometers' });
@@ -1401,12 +1616,19 @@ function setupControls() {
     const performSearch = async () => {
         const query = searchInput.value;
         if (!query) return;
+        if (!navigator.onLine) {
+            showStatusMessage('Address search is unavailable offline (Nominatim requires internet).', 'warn', 5000);
+            return;
+        }
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Norway&limit=1`);
             const data = await res.json();
             if (data.length > 0) setUserLocation([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
             else alert("Address not found.");
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            showStatusMessage('Address search failed. Check connection and try again.', 'warn', 5000);
+        }
     };
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
@@ -1542,6 +1764,33 @@ async function calculateRoute() {
         profile = 'foot';
     }
 
+    const setRouteResult = (distanceKm, durationMin, destinationLabel, isFallback) => {
+        document.getElementById('result-area').style.display = 'block';
+        document.getElementById('res-info').innerText = `${Math.round(durationMin)} min  /  ${distanceKm.toFixed(1)} km`;
+        document.getElementById('res-dest').innerHTML = `To: <b>${destinationLabel}</b>${isFallback ? ' (offline estimate)' : ''}`;
+    };
+
+    const setStraightLineRoute = () => {
+        const line = turf.lineString([currentPos, destCoords]);
+        map.getSource('route').setData(line.geometry);
+
+        const distanceKm = turf.distance(turf.point(currentPos), turf.point(destCoords), { units: 'kilometers' });
+        const speed = OFFLINE_ROUTE_SPEED_KMH[transportMode] || 30;
+        const durationMin = (distanceKm / speed) * 60;
+        const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
+
+        const bounds = new maplibregl.LngLatBounds();
+        line.geometry.coordinates.forEach(c => bounds.extend(c));
+        map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 50 }));
+        setRouteResult(distanceKm, durationMin, destName, true);
+    };
+
+    if (!navigator.onLine) {
+        setStraightLineRoute();
+        showStatusMessage('Offline: showing straight-line estimate. Turn-by-turn routing needs internet (OSRM).', 'warn', 6000);
+        return;
+    }
+
     try {
         const res = await fetch(`${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`);
         const json = await res.json();
@@ -1575,8 +1824,15 @@ async function calculateRoute() {
             const t = TRANSLATIONS[currentLang];
             const fromLabel = pinpointMarker ? `<span style="font-size:11px;color:#6b7280;font-weight:600;"><i class="fa-solid fa-map-pin" style="color:#e11d48;margin-right:3px;"></i>${t.resultFrom}</span><br>` : '';
             document.getElementById('res-dest').innerHTML = `${fromLabel}${t.resultTo} <b>${destName}</b>`;
+        } else {
+            setStraightLineRoute();
+            showStatusMessage('Routing service returned no route. Showing straight-line estimate.', 'warn', 6000);
         }
-    } catch (err) { console.error("Routing error:", err); }
+    } catch (err) {
+        console.error("Routing error:", err);
+        setStraightLineRoute();
+        showStatusMessage('Routing service unavailable. Showing straight-line estimate from cached data.', 'warn', 6000);
+    }
 }
 
 function loadTilfluktsromIcon(mapInstance) {
