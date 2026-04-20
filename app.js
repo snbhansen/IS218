@@ -240,9 +240,24 @@ const OFFLINE_REQUIRED_ASSETS = [
     '/data/datasett/drikkevann.geojson',
     '/data/datasett/sykehus.geojson'
 ];
+const OFFLINE_REQUIRED_PMTILES_ASSET = '/data/tiles/norway.pmtiles';
 const NORWAY_PMTILES_PATH = './data/tiles/norway.pmtiles';
 let usesCachedData = false;
 let basemapFallbackApplied = false;
+const CONNECTIVITY_PROBE_URLS = [
+    'https://www.gstatic.com/generate_204',
+    'https://cloudflare.com/cdn-cgi/trace'
+];
+const CONNECTIVITY_PROBE_TIMEOUT_MS = 3500;
+const CONNECTIVITY_POLL_INTERVAL_MS = 30000;
+const connectivityState = {
+    browserOnline: navigator.onLine,
+    internetReachable: null,
+    offlineReady: false,
+    offlineReadyLimited: false,
+    missingAssets: [],
+    updating: false
+};
 
 function showStatusMessage(message, type = 'info', ttlMs = 0) {
     const el = document.getElementById('status-message');
@@ -259,17 +274,161 @@ function showStatusMessage(message, type = 'info', ttlMs = 0) {
     }
 }
 
-function updateOfflineIndicator() {
+// Browser online state (navigator.onLine) and real internet reachability are different.
+// We keep them separate and render an honest status badge based on both + cached readiness.
+function renderConnectivityIndicator() {
     const indicator = document.getElementById('offline-indicator');
     if (!indicator) return;
 
-    const online = navigator.onLine;
-    indicator.className = `status-pill ${online ? 'online' : 'offline'}`;
-    indicator.textContent = online ? 'Online' : 'Offline mode';
+    const hasInternet = connectivityState.internetReachable === true;
+    const hasOffline = connectivityState.offlineReady;
+    const hasLimitedOffline = connectivityState.offlineReadyLimited;
 
-    if (!online) {
-        showStatusMessage('Offline mode active: using cached/local emergency data. Search, live routing, and 3D overpass data are unavailable.', 'warn');
+    indicator.className = `status-pill ${hasInternet ? 'online' : 'offline'}`;
+
+    if (hasInternet && hasOffline) {
+        indicator.textContent = 'Internet available · Offline-ready';
+    } else if (hasInternet) {
+        indicator.textContent = 'Internet available';
+    } else if (hasOffline) {
+        indicator.textContent = 'Internet unavailable · Offline-ready';
+    } else if (hasLimitedOffline) {
+        indicator.textContent = 'Internet unavailable · Offline-ready (limited services)';
+    } else {
+        indicator.textContent = 'Internet unavailable';
     }
+}
+
+function hasInternetConnectivity() {
+    if (typeof connectivityState.internetReachable === 'boolean') {
+        return connectivityState.internetReachable;
+    }
+
+    // Fallback only while first connectivity probe is still pending.
+    return navigator.onLine;
+}
+
+async function probeInternetConnectivity() {
+    if (!navigator.onLine) return false;
+
+    const probe = async (url) => {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), CONNECTIVITY_PROBE_TIMEOUT_MS);
+        try {
+            // no-cors keeps this lightweight and avoids CORS preflight; resolved fetch means network path is reachable.
+            await fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+            return true;
+        } catch {
+            return false;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    };
+
+    for (const url of CONNECTIVITY_PROBE_URLS) {
+        if (await probe(url)) return true;
+    }
+
+    return false;
+}
+
+async function checkOfflineReadinessStatus(includePmtiles = true) {
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+        return {
+            offlineReady: false,
+            offlineReadyLimited: false,
+            missingAssets: ['Service Worker / Cache Storage unavailable']
+        };
+    }
+
+    const registration = await navigator.serviceWorker.getRegistration('./');
+    if (!registration) {
+        return {
+            offlineReady: false,
+            offlineReadyLimited: false,
+            missingAssets: ['Service worker not registered']
+        };
+    }
+
+    const missingCoreAssets = [];
+    for (const assetPath of OFFLINE_REQUIRED_ASSETS) {
+        const url = new URL(assetPath, window.location.origin).href;
+        const match = await caches.match(url);
+        if (!match) missingCoreAssets.push(assetPath);
+    }
+
+    let pmtilesCached = true;
+    if (includePmtiles) {
+        const pmtilesUrl = new URL(OFFLINE_REQUIRED_PMTILES_ASSET, window.location.origin).href;
+        pmtilesCached = !!(await caches.match(pmtilesUrl));
+    }
+
+    const coreReady = missingCoreAssets.length === 0;
+    const offlineReady = coreReady && (!includePmtiles || pmtilesCached);
+    const offlineReadyLimited = coreReady && includePmtiles && !pmtilesCached;
+    const missingAssets = [...missingCoreAssets];
+    if (includePmtiles && !pmtilesCached) missingAssets.push(OFFLINE_REQUIRED_PMTILES_ASSET);
+
+    return { offlineReady, offlineReadyLimited, missingAssets };
+}
+
+async function refreshConnectivityAndReadiness(opts = {}) {
+    const { announce = false } = opts;
+    if (connectivityState.updating) return;
+
+    connectivityState.updating = true;
+
+    try {
+        connectivityState.browserOnline = navigator.onLine;
+        connectivityState.internetReachable = await probeInternetConnectivity();
+
+        const readiness = await checkOfflineReadinessStatus(true);
+        connectivityState.offlineReady = readiness.offlineReady;
+        connectivityState.offlineReadyLimited = readiness.offlineReadyLimited;
+        connectivityState.missingAssets = readiness.missingAssets;
+
+        renderConnectivityIndicator();
+
+        if (announce && !connectivityState.internetReachable) {
+            if (connectivityState.offlineReady) {
+                showStatusMessage('Internet unavailable. Offline-ready mode is active.', 'warn', 6000);
+            } else if (connectivityState.offlineReadyLimited) {
+                showStatusMessage('Internet unavailable. Offline-ready (limited services): PMTiles basemap cache is missing.', 'warn', 7000);
+            } else {
+                showStatusMessage('Internet unavailable and cache readiness is incomplete.', 'warn', 7000);
+            }
+        }
+    } catch (error) {
+        console.error('Connectivity/readiness refresh failed:', error);
+        renderConnectivityIndicator();
+    } finally {
+        connectivityState.updating = false;
+    }
+}
+
+function startConnectivityMonitoring() {
+    refreshConnectivityAndReadiness({ announce: false });
+
+    window.addEventListener('online', () => {
+        refreshConnectivityAndReadiness({ announce: true });
+        showStatusMessage('Browser network state changed: online. Verifying internet reachability...', 'info', 4000);
+    });
+
+    window.addEventListener('offline', () => {
+        refreshConnectivityAndReadiness({ announce: true });
+    });
+
+    window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            refreshConnectivityAndReadiness({ announce: false });
+        }
+    }, CONNECTIVITY_POLL_INTERVAL_MS);
+}
+
+function updateOfflineIndicator() {
+    // Kept for compatibility with existing calls.
+    renderConnectivityIndicator();
+
 }
 
 function registerServiceWorker() {
@@ -284,32 +443,24 @@ function registerServiceWorker() {
 }
 
 async function runOfflineReadinessCheck() {
-    if (!('serviceWorker' in navigator) || !('caches' in window)) {
-        showStatusMessage('Offline check unavailable in this browser.', 'warn', 5000);
-        return;
-    }
-
     try {
-        const registration = await navigator.serviceWorker.getRegistration('./');
-        if (!registration) {
-            showStatusMessage('Service worker is not registered yet. Open once online and refresh.', 'warn');
-            return;
-        }
+        const readiness = await checkOfflineReadinessStatus(true);
+        connectivityState.offlineReady = readiness.offlineReady;
+        connectivityState.offlineReadyLimited = readiness.offlineReadyLimited;
+        connectivityState.missingAssets = readiness.missingAssets;
+        renderConnectivityIndicator();
 
-        const missingAssets = [];
-        for (const assetPath of OFFLINE_REQUIRED_ASSETS) {
-            const url = new URL(assetPath, window.location.origin).href;
-            const match = await caches.match(url);
-            if (!match) missingAssets.push(assetPath);
-        }
-
-        if (missingAssets.length === 0) {
-            showStatusMessage('Offline readiness OK: app shell and emergency datasets are cached.', 'info');
+        if (readiness.offlineReady) {
+            showStatusMessage('Offline readiness OK: app shell, emergency datasets, and PMTiles basemap are cached.', 'info');
+        } else if (readiness.offlineReadyLimited) {
+            showStatusMessage('Offline-ready (limited services): app shell and emergency data are cached, but PMTiles basemap is missing.', 'warn', 7000);
         } else {
-            const shortList = missingAssets.slice(0, 4).join(', ');
-            const suffix = missingAssets.length > 4 ? '...' : '';
-            showStatusMessage(`Offline not fully ready. Missing ${missingAssets.length} assets: ${shortList}${suffix}`, 'warn');
+            const shortList = readiness.missingAssets.slice(0, 4).join(', ');
+            const suffix = readiness.missingAssets.length > 4 ? '...' : '';
+            showStatusMessage(`Offline not ready. Missing ${readiness.missingAssets.length} assets: ${shortList}${suffix}`, 'warn');
         }
+
+        await refreshConnectivityAndReadiness({ announce: false });
     } catch (error) {
         console.error('Offline readiness check failed:', error);
         showStatusMessage('Offline readiness check failed. See console for details.', 'error', 6000);
@@ -397,7 +548,7 @@ let threeDViewTrackingBound = false;
 async function fetchGeoJSON(tableName) {
     console.log(`Henter data fra tabell: ${tableName}...`);
 
-    if (!navigator.onLine) {
+    if (!hasInternetConnectivity()) {
         try {
             const localData = await fetchLocalGeoJSON(tableName);
             usesCachedData = true;
@@ -650,7 +801,7 @@ map.on('error', (event) => {
         showStatusMessage('Basemap tiles are unavailable. Emergency layers remain available.', 'warn', 7000);
     } else if (sourceId === 'norway') {
         showStatusMessage('Offline Norway basemap could not be read. Check data/tiles/norway.pmtiles.', 'warn', 7000);
-        if (!basemapFallbackApplied && navigator.onLine) {
+        if (!basemapFallbackApplied && hasInternetConnectivity()) {
             basemapFallbackApplied = true;
             map.setStyle(buildRasterFallbackStyle());
             showStatusMessage('Switched to online raster basemap fallback.', 'warn', 7000);
@@ -1221,7 +1372,7 @@ async function toggle3DCityView() {
         return;
     }
 
-    if (!navigator.onLine) {
+    if (!hasInternetConnectivity()) {
         showStatusMessage('3D city buildings require internet (Overpass API).', 'warn', 6000);
         return;
     }
@@ -1353,14 +1504,7 @@ let destinationMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     registerServiceWorker();
-    updateOfflineIndicator();
-    window.addEventListener('online', () => {
-        updateOfflineIndicator();
-        showStatusMessage('Connection restored. Live services are available again.', 'info', 4000);
-    });
-    window.addEventListener('offline', () => {
-        updateOfflineIndicator();
-    });
+    startConnectivityMonitoring();
 
     const slider = document.getElementById('radius-slider');
     const label = document.getElementById('radius-label');
@@ -1397,7 +1541,7 @@ map.on('click', async (e) => {
     const radius = parseInt(document.getElementById('radius-slider').value, 10);
     showClickCircle(lng, lat, radius);
 
-    if (!navigator.onLine) {
+    if (!hasInternetConnectivity()) {
         const localResults = findNearbyLocalResources(lng, lat, radius);
         showStatusMessage('Offline: radius results are computed from cached emergency data.', 'warn', 5000);
         renderNearbyResults(localResults);
@@ -1702,7 +1846,7 @@ function setupControls() {
     const performSearch = async () => {
         const query = searchInput.value;
         if (!query) return;
-        if (!navigator.onLine) {
+        if (!hasInternetConnectivity()) {
             showStatusMessage('Address search is unavailable offline (Nominatim requires internet).', 'warn', 5000);
             return;
         }
@@ -1871,7 +2015,7 @@ async function calculateRoute() {
         setRouteResult(distanceKm, durationMin, destName, true);
     };
 
-    if (!navigator.onLine) {
+    if (!hasInternetConnectivity()) {
         setStraightLineRoute();
         showStatusMessage('Offline: showing straight-line estimate. Turn-by-turn routing needs internet (OSRM).', 'warn', 6000);
         return;
