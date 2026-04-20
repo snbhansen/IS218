@@ -240,7 +240,9 @@ const OFFLINE_REQUIRED_ASSETS = [
     '/data/datasett/drikkevann.geojson',
     '/data/datasett/sykehus.geojson'
 ];
+const NORWAY_PMTILES_PATH = './data/tiles/norway.pmtiles';
 let usesCachedData = false;
+let basemapFallbackApplied = false;
 
 function showStatusMessage(message, type = 'info', ttlMs = 0) {
     const el = document.getElementById('status-message');
@@ -490,74 +492,151 @@ async function fetchGeoJSON(tableName) {
 }
 
 // MAP SETUP
-const mapStyle = {
-    'version': 8,
-    'sources': {
-        'osm': {
-            'type': 'raster',
-            'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            'tileSize': 256,
-            'maxzoom': 19,
-            'attribution': '&copy; OpenStreetMap Contributors'
+function buildRasterFallbackStyle() {
+    return {
+        'version': 8,
+        'sources': {
+            'osm': {
+                'type': 'raster',
+                'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                'tileSize': 256,
+                'maxzoom': 19,
+                'attribution': '&copy; OpenStreetMap Contributors'
+            },
+            'kartverket-topo': {
+                'type': 'raster',
+                'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
+                'tileSize': 256,
+                'maxzoom': 20,
+                'attribution': '&copy; Kartverket'
+            },
+            'kartverket-farger': {
+                'type': 'raster',
+                'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
+                'tileSize': 256,
+                'maxzoom': 20,
+                'attribution': '&copy; Kartverket'
+            },
+            'kartverket-graatone': {
+                'type': 'raster',
+                'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
+                'tileSize': 256,
+                'maxzoom': 20,
+                'attribution': '&copy; Kartverket'
+            }
         },
-        'kartverket-topo': {
-            'type': 'raster',
-            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
-            'tileSize': 256,
-            'maxzoom': 20,
-            'attribution': '&copy; Kartverket'
+        'layers': [
+            {
+                'id': 'fallback-background',
+                'type': 'background',
+                'paint': { 'background-color': '#e5e7eb' }
+            },
+            {
+                'id': 'osm-layer',
+                'type': 'raster',
+                'source': 'osm'
+            },
+            {
+                'id': 'kartverket-topo-layer',
+                'type': 'raster',
+                'source': 'kartverket-topo',
+                'layout': { 'visibility': 'none' }
+            },
+            {
+                'id': 'kartverket-farger-layer',
+                'type': 'raster',
+                'source': 'kartverket-farger',
+                'layout': { 'visibility': 'none' }
+            },
+            {
+                'id': 'kartverket-graatone-layer',
+                'type': 'raster',
+                'source': 'kartverket-graatone',
+                'layout': { 'visibility': 'none' }
+            }
+        ]
+    };
+}
+
+function buildNorwayPmtilesStyle() {
+    return {
+        version: 8,
+        sources: {
+            norway: {
+                type: 'vector',
+                url: `pmtiles://${NORWAY_PMTILES_PATH}`,
+                attribution: '&copy; OpenMapTiles &copy; OpenStreetMap contributors'
+            }
         },
-        'kartverket-farger': {
-            'type': 'raster',
-            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
-            'tileSize': 256,
-            'maxzoom': 20,
-            'attribution': '&copy; Kartverket'
-        },
-        'kartverket-graatone': {
-            'type': 'raster',
-            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
-            'tileSize': 256,
-            'maxzoom': 20,
-            'attribution': '&copy; Kartverket'
+        layers: [
+            {
+                id: 'background',
+                type: 'background',
+                paint: { 'background-color': '#eef2f7' }
+            },
+            {
+                id: 'water',
+                type: 'fill',
+                source: 'norway',
+                'source-layer': 'water',
+                paint: { 'fill-color': '#a7d3f5' }
+            },
+            {
+                id: 'landcover',
+                type: 'fill',
+                source: 'norway',
+                'source-layer': 'landcover',
+                paint: { 'fill-color': '#dcead4', 'fill-opacity': 0.65 }
+            },
+            {
+                id: 'roads',
+                type: 'line',
+                source: 'norway',
+                'source-layer': 'transportation',
+                paint: {
+                    'line-color': '#4b5563',
+                    'line-width': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        6, 0.4,
+                        10, 1.2,
+                        14, 2.6
+                    ],
+                    'line-opacity': 0.9
+                }
+            },
+            {
+                id: 'buildings',
+                type: 'fill',
+                source: 'norway',
+                'source-layer': 'building',
+                minzoom: 13,
+                paint: { 'fill-color': '#d1d5db', 'fill-opacity': 0.7 }
+            }
+        ]
+    };
+}
+
+function buildInitialMapStyle() {
+    if (window.pmtiles && maplibregl && typeof maplibregl.addProtocol === 'function') {
+        try {
+            const protocol = new window.pmtiles.Protocol();
+            maplibregl.addProtocol('pmtiles', protocol.tile);
+            return buildNorwayPmtilesStyle();
+        } catch (error) {
+            console.warn('PMTiles protocol setup failed, using raster fallback:', error);
+            showStatusMessage('Could not initialize offline basemap. Falling back to online raster tiles.', 'warn', 7000);
         }
-    },
-    'layers': [
-        {
-            'id': 'fallback-background',
-            'type': 'background',
-            'paint': { 'background-color': '#e5e7eb' }
-        },
-        {
-            'id': 'osm-layer',
-            'type': 'raster',
-            'source': 'osm'
-        },
-        {
-            'id': 'kartverket-topo-layer',
-            'type': 'raster',
-            'source': 'kartverket-topo',
-            'layout': { 'visibility': 'none' }
-        },
-        {
-            'id': 'kartverket-farger-layer',
-            'type': 'raster',
-            'source': 'kartverket-farger',
-            'layout': { 'visibility': 'none' }
-        },
-        {
-            'id': 'kartverket-graatone-layer',
-            'type': 'raster',
-            'source': 'kartverket-graatone',
-            'layout': { 'visibility': 'none' }
-        }
-    ]
-};
+    }
+
+    return buildRasterFallbackStyle();
+}
 
 try {
     map = new maplibregl.Map({
         container: 'map',
-        style: mapStyle,
+        style: buildInitialMapStyle(),
         center: [8.0182, 58.1467], // Kristiansand
         zoom: 12,
         canvasContextAttributes: { antialias: true }
@@ -569,6 +648,13 @@ map.on('error', (event) => {
     const sourceId = event && event.sourceId ? event.sourceId : '';
     if (sourceId === 'osm') {
         showStatusMessage('Basemap tiles are unavailable. Emergency layers remain available.', 'warn', 7000);
+    } else if (sourceId === 'norway') {
+        showStatusMessage('Offline Norway basemap could not be read. Check data/tiles/norway.pmtiles.', 'warn', 7000);
+        if (!basemapFallbackApplied && navigator.onLine) {
+            basemapFallbackApplied = true;
+            map.setStyle(buildRasterFallbackStyle());
+            showStatusMessage('Switched to online raster basemap fallback.', 'warn', 7000);
+        }
     }
 });
 
@@ -728,7 +814,7 @@ map.on('load', async () => {
         activeBaseMap = key;
         const isSatellite = key === 'satellite';
         Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
-            map.setLayoutProperty(layerId, 'visibility', (!isSatellite && k === key) ? 'visible' : 'none');
+            try { map.setLayoutProperty(layerId, 'visibility', (!isSatellite && k === key) ? 'visible' : 'none'); } catch (_) {}
         });
         if (isSatellite) {
             map.setMaxZoom(SATELLITE_MAX_ZOOM);

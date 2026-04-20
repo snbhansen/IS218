@@ -11,6 +11,7 @@ const APP_SHELL_ASSETS = [
   '/data/datasett/sykehus.geojson',
   'https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css',
   'https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js',
+  'https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js',
   'https://unpkg.com/@turf/turf/turf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
@@ -42,6 +43,10 @@ function isSameOriginAsset(requestUrl) {
   return requestUrl.origin === self.location.origin;
 }
 
+function isPmtilesRequest(requestUrl) {
+  return requestUrl.pathname.endsWith('.pmtiles');
+}
+
 function isTileRequest(requestUrl) {
   return requestUrl.hostname.endsWith('tile.openstreetmap.org');
 }
@@ -60,6 +65,9 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const requestUrl = new URL(request.url);
+
+  // PMTiles relies on byte range requests. Let the browser/network stack handle it directly.
+  if (isPmtilesRequest(requestUrl)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
