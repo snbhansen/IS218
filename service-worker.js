@@ -195,8 +195,7 @@ self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(request.url);
 
   if (isPmtilesRequest(requestUrl)) {
-    event.respondWith(handlePmtilesRequest(request));
-    return;
+  return;
   }
 
   if (request.mode === 'navigate') {
