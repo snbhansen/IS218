@@ -21,9 +21,13 @@ const TRANSLATIONS = {
         modeDrive: 'Drive',
         resultLabel: 'Distance / Time',
         resultTo: 'To:',
+        resultFrom: 'From pin',
         findAllInRange: 'Find all within range',
         clickToSearch: 'Click map to search',
         clickModeOn: 'Click mode ON – click map',
+        pinpointMode: 'Pin location → route',
+        pinpointModeOn: 'Tap map to drop pin',
+        clearRoute: 'Clear',
         layers: 'Layers',
         noResults: 'No resources found within radius.',
         resourcesWithin: 'resource(s) within',
@@ -50,9 +54,13 @@ const TRANSLATIONS = {
         modeDrive: 'Kjør',
         resultLabel: 'Avstand / Tid',
         resultTo: 'Til:',
+        resultFrom: 'Fra pin',
         findAllInRange: 'Finn alle i nærheten',
         clickToSearch: 'Klikk på kartet for å søke',
         clickModeOn: 'Klikkemodus PÅ – klikk på kart',
+        pinpointMode: 'Fest pin → rute',
+        pinpointModeOn: 'Trykk på kartet for å feste pin',
+        clearRoute: 'Fjern',
         layers: 'Lag',
         noResults: 'Ingen ressurser funnet innenfor radius.',
         resourcesWithin: 'ressurs(er) innenfor',
@@ -79,9 +87,13 @@ const TRANSLATIONS = {
         modeDrive: 'Fahren',
         resultLabel: 'Entfernung / Zeit',
         resultTo: 'Nach:',
+        resultFrom: 'Von Pin',
         findAllInRange: 'Alle im Umkreis finden',
         clickToSearch: 'Karte klicken zum Suchen',
         clickModeOn: 'Klickmodus AN – Karte klicken',
+        pinpointMode: 'Pin setzen → Route',
+        pinpointModeOn: 'Karte tippen für Pin',
+        clearRoute: 'Löschen',
         layers: 'Ebenen',
         noResults: 'Keine Ressourcen im Radius gefunden.',
         resourcesWithin: 'Ressource(n) innerhalb',
@@ -108,9 +120,13 @@ const TRANSLATIONS = {
         modeDrive: 'Conduire',
         resultLabel: 'Distance / Temps',
         resultTo: 'Vers:',
+        resultFrom: 'Depuis pin',
         findAllInRange: 'Trouver tous dans le rayon',
         clickToSearch: 'Cliquer sur la carte',
         clickModeOn: 'Mode clic ACTIF – cliquer sur la carte',
+        pinpointMode: 'Épingler → itinéraire',
+        pinpointModeOn: 'Toucher la carte pour épingler',
+        clearRoute: 'Effacer',
         layers: 'Couches',
         noResults: 'Aucune ressource trouvée dans le rayon.',
         resourcesWithin: 'ressource(s) dans',
@@ -137,9 +153,13 @@ const TRANSLATIONS = {
         modeDrive: 'Їхати',
         resultLabel: 'Відстань / Час',
         resultTo: 'До:',
+        resultFrom: 'Від піна',
         findAllInRange: 'Знайти всіх у радіусі',
         clickToSearch: 'Клікніть на карті для пошуку',
         clickModeOn: 'Режим кліку УВІМК – клікніть на карті',
+        pinpointMode: 'Пін → маршрут',
+        pinpointModeOn: 'Натисніть карту для піна',
+        clearRoute: 'Очистити',
         layers: 'Шари',
         noResults: 'Ресурсів у радіусі не знайдено.',
         resourcesWithin: 'ресурс(ів) у межах',
@@ -173,6 +193,13 @@ function setLanguage(lang) {
         clickBtn.innerHTML = clickModeActive
             ? `<i class="fa-solid fa-circle-xmark"></i> ${t.clickModeOn}`
             : `<i class="fa-solid fa-crosshairs"></i> ${t.clickToSearch}`;
+    }
+
+    const pinBtn = document.getElementById('btn-pinpoint-mode');
+    if (pinBtn) {
+        pinBtn.innerHTML = pinpointModeActive
+            ? `<i class="fa-solid fa-circle-xmark"></i> <span>${t.pinpointModeOn}</span>`
+            : `<i class="fa-solid fa-map-pin"></i> <span>${t.pinpointMode}</span>`;
     }
 }
 
@@ -390,7 +417,7 @@ map.on('load', async () => {
         type: 'raster',
         tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
         tileSize: 256,
-        maxzoom: 19,
+        maxzoom: 17,
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS'
     });
     map.addLayer({ id: 'ortofoto-layer', type: 'raster', source: 'ortofoto-source', layout: { visibility: 'none' } });
@@ -493,11 +520,18 @@ map.on('load', async () => {
     // 4. Rute-lag (tomt foreløpig) - bruk FeatureCollection som utgangspunkt
     map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
+        id: 'route-layer-casing',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.8 }
+    });
+    map.addLayer({
         id: 'route-layer',
         type: 'line',
         source: 'route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.8 }
+        paint: { 'line-color': '#1d4ed8', 'line-width': 5, 'line-opacity': 0.95 }
     });
 
     // Base map switcher
@@ -510,6 +544,7 @@ map.on('load', async () => {
     let activeBaseMap = 'osm';
 
     const FLYBILDER_ZOOM_THRESHOLD = 13;
+    const SATELLITE_MAX_ZOOM = 18;
 
     function updateSatelliteLayers(isActive) {
         if (!isActive) {
@@ -549,6 +584,11 @@ map.on('load', async () => {
         Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
             map.setLayoutProperty(layerId, 'visibility', (!isSatellite && k === key) ? 'visible' : 'none');
         });
+        if (isSatellite) {
+            map.setMaxZoom(SATELLITE_MAX_ZOOM);
+        } else {
+            map.setMaxZoom(22);
+        }
         updateSatelliteLayers(isSatellite);
         document.querySelectorAll('#basemap-selector .basemap-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.basemap === key);
@@ -572,6 +612,7 @@ map.on('load', async () => {
     });
 
     setupControls();
+    setTimeout(function () { if (typeof startInfoBarSync === 'function') startInfoBarSync(); }, 400);
 });
 // --- 2D / 3D VIEW MODE HELPERS ---
 function setupViewModeToggle() {
@@ -661,7 +702,7 @@ function get3DActivationCenter() {
 }
 
 function getNorway3DInsertBeforeId() {
-    const candidates = ['tilfluktsrom-layer', 'brannstasjoner-layer', 'drikkevann-layer', 'sykehus-layer', 'route-layer'];
+    const candidates = ['tilfluktsrom-layer', 'brannstasjoner-layer', 'drikkevann-layer', 'sykehus-layer', 'route-layer-casing', 'route-layer'];
     return candidates.find(layerId => map.getLayer(layerId));
 }
 
@@ -1064,6 +1105,9 @@ function toggleTerrainView() {
 let clickModeActive = false;
 let clickMarker = null;
 let nearbyMarkers = [];
+let pinpointModeActive = false;
+let pinpointMarker = null;
+let destinationMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('radius-slider');
@@ -1084,6 +1128,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 map.on('click', async (e) => {
+    if (pinpointModeActive) {
+        setPinpointLocation([e.lngLat.lng, e.lngLat.lat]);
+        return;
+    }
     if (!clickModeActive) return;
     const lng = e.lngLat.lng;
     const lat = e.lngLat.lat;
@@ -1158,6 +1206,68 @@ function clearNearbyResults() {
     if (map.getSource('click-circle')) map.removeSource('click-circle');
     const panel = document.getElementById('nearby-results');
     if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+}
+
+// ── PINPOINT ROUTING ────────────────────────────────────────────────────────
+
+function startPinpointMode() {
+    if (clickModeActive) {
+        clickModeActive = false;
+        const btn = document.getElementById('btn-click-mode');
+        if (btn) {
+            btn.classList.remove('active');
+            btn.innerHTML = `<i class="fa-solid fa-crosshairs"></i> ${TRANSLATIONS[currentLang].clickToSearch}`;
+        }
+        map.getCanvas().style.cursor = '';
+        clearNearbyResults();
+    }
+    pinpointModeActive = true;
+    const btn = document.getElementById('btn-pinpoint-mode');
+    if (btn) {
+        btn.classList.add('active');
+        btn.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <span>${TRANSLATIONS[currentLang].pinpointModeOn}</span>`;
+    }
+    map.getCanvas().style.cursor = 'crosshair';
+}
+
+function stopPinpointMode() {
+    pinpointModeActive = false;
+    map.getCanvas().style.cursor = '';
+    const btn = document.getElementById('btn-pinpoint-mode');
+    if (btn) {
+        btn.classList.remove('active');
+        btn.innerHTML = `<i class="fa-solid fa-map-pin"></i> <span>${TRANSLATIONS[currentLang].pinpointMode}</span>`;
+    }
+}
+
+function setPinpointLocation(coords) {
+    stopPinpointMode();
+    currentPos = coords;
+
+    if (userMarker) { userMarker.remove(); userMarker = null; }
+    if (pinpointMarker) { pinpointMarker.remove(); pinpointMarker = null; }
+
+    const el = document.createElement('div');
+    el.className = 'pinpoint-marker-el';
+    el.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#e11d48;font-size:38px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));"></i>`;
+    pinpointMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat(coords)
+        .addTo(map);
+
+    calculateRoute();
+}
+
+function clearRoute() {
+    currentPos = null;
+    if (pinpointMarker) { pinpointMarker.remove(); pinpointMarker = null; }
+    if (userMarker) { userMarker.remove(); userMarker = null; }
+    if (destinationMarker) { destinationMarker.remove(); destinationMarker = null; }
+    if (map.getSource('route')) {
+        map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+    }
+    const resultArea = document.getElementById('result-area');
+    if (resultArea) resultArea.style.display = 'none';
+    stopPinpointMode();
 }
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -1323,6 +1433,19 @@ function setupControls() {
         });
     });
 
+    const btnPinpoint = document.getElementById('btn-pinpoint-mode');
+    if (btnPinpoint) {
+        btnPinpoint.addEventListener('click', () => {
+            if (pinpointModeActive) stopPinpointMode();
+            else startPinpointMode();
+        });
+    }
+
+    const btnClearRoute = document.getElementById('btn-clear-route');
+    if (btnClearRoute) {
+        btnClearRoute.addEventListener('click', clearRoute);
+    }
+
     // Layer Checkboxes
     const toggles = [
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
@@ -1416,13 +1539,29 @@ async function calculateRoute() {
 
             const bounds = new maplibregl.LngLatBounds();
             route.geometry.coordinates.forEach(c => bounds.extend(c));
-            map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 50 }));
+            map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 60 }));
 
+            if (destinationMarker) destinationMarker.remove();
+            const destEl = document.createElement('div');
+            destEl.className = 'destination-marker-el';
+            const catColors = { tilfluktsrom: '#f59e0b', brannstasjoner: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
+            const catIcons = { tilfluktsrom: 'fa-shield-halved', brannstasjoner: 'fa-fire-extinguisher', sykehus: 'fa-hospital', drikkevann: 'fa-droplet' };
+            const iconColor = catColors[category] || '#374151';
+            const iconName = catIcons[category] || 'fa-location-dot';
+            destEl.innerHTML = `<div style="background:white;border:3px solid ${iconColor};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);"><i class="fa-solid ${iconName}" style="color:${iconColor};font-size:16px;"></i></div>`;
+            destinationMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
+                .setLngLat(destCoords)
+                .addTo(map);
+
+            const mins = Math.round(route.duration / 60);
+            const km = (route.distance / 1000).toFixed(1);
             document.getElementById('result-area').style.display = 'block';
-            document.getElementById('res-info').innerText = `${Math.round(route.duration / 60)} min  /  ${(route.distance / 1000).toFixed(1)} km`;
+            document.getElementById('res-info').innerText = `${mins} min  ·  ${km} km`;
 
-            const destName = props.navn || props.adresse || props.brannstasjon || "Destination";
-            document.getElementById('res-dest').innerHTML = `${TRANSLATIONS[currentLang].resultTo} <b>${destName}</b>`;
+            const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
+            const t = TRANSLATIONS[currentLang];
+            const fromLabel = pinpointMarker ? `<span style="font-size:11px;color:#6b7280;font-weight:600;"><i class="fa-solid fa-map-pin" style="color:#e11d48;margin-right:3px;"></i>${t.resultFrom}</span><br>` : '';
+            document.getElementById('res-dest').innerHTML = `${fromLabel}${t.resultTo} <b>${destName}</b>`;
         }
     } catch (err) { console.error("Routing error:", err); }
 }
