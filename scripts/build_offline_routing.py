@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import math
 from dataclasses import dataclass
@@ -372,7 +373,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Build an offline routing graph from a local OSM PBF.')
     parser.add_argument('--pbf', default='data/osm/sorlandet-260427.osm.pbf', help='Input OSM PBF file.')
     parser.add_argument('--region', default='data/datasett/agder_grense.geojson', help='GeoJSON file defining the routing area (bbox clip).')
-    parser.add_argument('--output', default='data/routing/agder-routing-graph.json', help='Output graph JSON file.')
+    parser.add_argument('--output', default='data/routing/agder-routing-graph.json.gz', help='Output graph JSON file (.json or .json.gz).')
     parser.add_argument('--buffer-degrees', type=float, default=0.06, help='Bounding-box buffer around the region in degrees.')
     parser.add_argument('--no-region-clip', action='store_true', help='Disable region clipping and build from whole PBF.')
     args = parser.parse_args()
@@ -396,7 +397,12 @@ def main() -> None:
 
     payload = build_graph_from_pbf(pbf_path, clip_bounds)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    serialized = json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    if output_path.suffix == '.gz':
+        with gzip.open(output_path, 'wb', compresslevel=9) as handle:
+            handle.write(serialized)
+    else:
+        output_path.write_bytes(serialized)
     print(
         f'Wrote {output_path} '
         f'({output_path.stat().st_size / 1024 / 1024:.2f} MB, '

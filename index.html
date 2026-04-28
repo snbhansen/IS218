@@ -32,6 +32,54 @@
             height: 100%;
         }
 
+        #status-bar {
+            position: absolute;
+            left: 14px;
+            bottom: 14px;
+            z-index: 1300;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: calc(100vw - 28px);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            backdrop-filter: blur(4px);
+        }
+
+        .status-pill.online {
+            background: rgba(16, 185, 129, 0.14);
+            border-color: rgba(16, 185, 129, 0.38);
+            color: #065f46;
+        }
+
+        .status-pill.offline {
+            background: rgba(239, 68, 68, 0.14);
+            border-color: rgba(239, 68, 68, 0.38);
+            color: #7f1d1d;
+        }
+
+        #status-message {
+            display: none;
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #111827;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #d1d5db;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+        }
+
         /* ── Map search overlay (Google Maps style) ── */
         #map-search-overlay {
             position: absolute;
@@ -930,6 +978,13 @@
             #ui-container {
                 top: 202px;
                 width: min(320px, calc(100vw - 24px));
+            }
+
+            #status-bar {
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+                max-width: none;
             }
         }
     </style>

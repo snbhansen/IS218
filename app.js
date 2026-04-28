@@ -230,7 +230,7 @@ const OFFLINE_ROUTE_SPEED_KMH = {
     walking: 5,
     driving: 50
 };
-const OFFLINE_ROUTING_GRAPH_PATH = './data/routing/agder-routing-graph.json';
+const OFFLINE_ROUTING_GRAPH_PATH = './data/routing/agder-routing-graph.json.gz';
 const OFFLINE_ROUTING_GRID_SIZE_DEG = 0.02;
 const OFFLINE_ROUTING_MAX_SNAP_RINGS = 6;
 const OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M = 3000;
@@ -240,7 +240,7 @@ const OFFLINE_REQUIRED_ASSETS = [
     '/app.js',
     '/manifest.webmanifest',
     '/icons/pwa-icon.svg',
-    '/data/routing/agder-routing-graph.json',
+    '/data/routing/agder-routing-graph.json.gz',
     '/data/datasett/tilfluktsrom.geojson',
     '/data/datasett/brannstasjoner.geojson',
     '/data/datasett/drikkevann.geojson',
@@ -2073,7 +2073,25 @@ async function loadOfflineRoutingGraph() {
             throw new Error(`Offline graph fetch failed with status ${response.status}`);
         }
 
-        const payload = await response.json();
+        const decodeJsonPayload = async () => {
+            const isGzipAsset = OFFLINE_ROUTING_GRAPH_PATH.endsWith('.gz');
+
+            if (isGzipAsset) {
+                if (typeof DecompressionStream === 'undefined') {
+                    throw new Error('Browser does not support gzip decompression for offline graph');
+                }
+
+                const compressedBuffer = await response.arrayBuffer();
+                const compressedBlob = new Blob([compressedBuffer]);
+                const decompressedStream = compressedBlob.stream().pipeThrough(new DecompressionStream('gzip'));
+                const decompressedText = await new Response(decompressedStream).text();
+                return JSON.parse(decompressedText);
+            }
+
+            return response.json();
+        };
+
+        const payload = await decodeJsonPayload();
         const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
         const drivingEdges = payload.graphs && Array.isArray(payload.graphs.driving) ? payload.graphs.driving : [];
         const walkingEdges = payload.graphs && Array.isArray(payload.graphs.walking) ? payload.graphs.walking : [];

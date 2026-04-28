@@ -209,3 +209,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Offline routing build artifacts (keep compressed graph for git)
+data/osm/*.osm.pbf
+data/routing/*.json
+!data/routing/*.json.gz
