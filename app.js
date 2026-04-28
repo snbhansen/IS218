@@ -297,6 +297,16 @@ function renderConnectivityIndicator() {
     } else {
         indicator.textContent = 'Internet unavailable';
     }
+
+    if (!hasInternet && mapLoaded && (terrainActive || city3DActive)) {
+        showStatusMessage('Offline: 3D Terrain og 3D City er deaktivert.', 'warn', 6000);
+        restore2DMapView();
+        return;
+    }
+
+    if (typeof updateViewModeToggle === 'function') {
+        updateViewModeToggle(false);
+    }
 }
 
 function hasInternetConnectivity() {
@@ -1035,18 +1045,24 @@ function updateViewModeToggle(isLoading) {
     if (!btn2D || !btn3D || !btnTerrain) return;
 
     const in2D = !terrainActive && !city3DActive;
+    const online = hasInternetConnectivity();
 
     btn2D.classList.toggle('active', in2D);
     btnTerrain.classList.toggle('active', terrainActive);
     btn3D.classList.toggle('active', city3DActive);
+
+    btnTerrain.style.display = online ? '' : 'none';
+    btn3D.style.display = online ? '' : 'none';
 
     btn2D.setAttribute('aria-pressed', in2D ? 'true' : 'false');
     btnTerrain.setAttribute('aria-pressed', terrainActive ? 'true' : 'false');
     btn3D.setAttribute('aria-pressed', city3DActive ? 'true' : 'false');
 
     btn2D.disabled = !!isLoading;
-    btnTerrain.disabled = !!isLoading;
-    btn3D.disabled = !!isLoading;
+    btnTerrain.disabled = !!isLoading || !online;
+    btn3D.disabled = !!isLoading || !online;
+    btnTerrain.title = online ? '' : 'Requires internet';
+    btn3D.title = online ? '' : 'Requires internet';
     btn3D.textContent = isLoading
         ? TRANSLATIONS[currentLang].view3dLoading
         : TRANSLATIONS[currentLang].view3d;
@@ -1363,6 +1379,11 @@ async function syncNorway3DBuildingsToCurrentView() {
 async function toggle3DCityView() {
     if (!mapLoaded) return;
 
+    if (!hasInternetConnectivity()) {
+        showStatusMessage('3D City requires internet.', 'warn', 5000);
+        return;
+    }
+
     if (city3DActive) {
         city3DActive = false;
         suppress3DBuildingRefresh = false;
@@ -1447,6 +1468,11 @@ function restore2DMapView() {
 
 function toggleTerrainView() {
     if (!mapLoaded) return;
+
+    if (!hasInternetConnectivity()) {
+        showStatusMessage('3D Terrain requires internet.', 'warn', 5000);
+        return;
+    }
 
     if (terrainActive) {
         terrainActive = false;
