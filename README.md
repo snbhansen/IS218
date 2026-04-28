@@ -2,7 +2,7 @@
 Student repository – Group 15
 
 ## Kort Beskrivelse 
-Dette prosjektet er et responsivt webkart (SPA) som hjelper innbyggere i Norge med å finne nærmeste beredskapsressurs når tid er kritisk. Brukeren kan bruke GPS via posisjonsknappen eller søke etter adresse, og appen finner nærmeste drikkevann, tilfluktsrom, brannstasjon eller sykehus. Deretter beregnes rute (bil eller gange), og appen viser estimert tid og avstand. Løsningen er sentrert på Kristiansand/Agder, men enkelte funksjoner som adressesøk og 3D-visning er satt opp for Norge.
+Dette prosjektet er et responsivt webkart (SPA) som hjelper innbyggere i Norge, med fokus på Kristiansand/Agder, med å finne nærmeste beredskapsressurs når tid er kritisk. Brukeren kan bruke GPS via posisjonsknappen eller søke etter adresse, og appen finner nærmeste drikkevann, tilfluktsrom, brannstasjon eller sykehus. Deretter beregnes rute (bil eller gange), og appen viser estimert tid og avstand. Løsningen er sentrert på Kristiansand/Agder, men enkelte funksjoner som adressesøk og 3D-visning er satt opp for Norge.
 
 
 ## Demo
