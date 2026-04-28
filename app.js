@@ -230,11 +230,17 @@ const OFFLINE_ROUTE_SPEED_KMH = {
     walking: 5,
     driving: 50
 };
+const OFFLINE_ROUTING_GRAPH_PATH = './data/routing/agder-routing-graph.json';
+const OFFLINE_ROUTING_GRID_SIZE_DEG = 0.02;
+const OFFLINE_ROUTING_MAX_SNAP_RINGS = 6;
+const OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M = 3000;
+const OFFLINE_ROUTING_HEURISTIC_SPEED_MPS = 36;
 const OFFLINE_REQUIRED_ASSETS = [
     '/index.html',
     '/app.js',
     '/manifest.webmanifest',
     '/icons/pwa-icon.svg',
+    '/data/routing/agder-routing-graph.json',
     '/data/datasett/tilfluktsrom.geojson',
     '/data/datasett/brannstasjoner.geojson',
     '/data/datasett/drikkevann.geojson',
@@ -554,6 +560,8 @@ let pending3DBuildingAreaKey = null;
 let norway3DBuildingsPromise = null;
 let suppress3DBuildingRefresh = false;
 let threeDViewTrackingBound = false;
+let offlineRoutingGraphState = null;
+let offlineRoutingGraphPromise = null;
 // --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
 async function fetchGeoJSON(tableName) {
     console.log(`Henter data fra tabell: ${tableName}...`);
@@ -1999,6 +2007,304 @@ function setUserLocation(coords, accuracyMeters) {
     calculateRoute();
 }
 
+function haversineMeters(pointA, pointB) {
+    const lon1 = pointA[0];
+    const lat1 = pointA[1];
+    const lon2 = pointB[0];
+    const lat2 = pointB[1];
+    const radius = 6371000;
+    const toRad = Math.PI / 180;
+    const phi1 = lat1 * toRad;
+    const phi2 = lat2 * toRad;
+    const dPhi = (lat2 - lat1) * toRad;
+    const dLambda = (lon2 - lon1) * toRad;
+    const a = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+    return 2 * radius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function buildOfflineRoutingAdjacency(edges, nodeCount) {
+    const adjacency = Array.from({ length: nodeCount }, () => []);
+    for (const edge of edges) {
+        if (!Array.isArray(edge) || edge.length < 5) continue;
+        const from = edge[0];
+        const to = edge[1];
+        const distanceM = edge[3];
+        const costS = edge[4];
+        if (!Number.isInteger(from) || !Number.isInteger(to)) continue;
+        if (from < 0 || to < 0 || from >= nodeCount || to >= nodeCount) continue;
+        if (!Number.isFinite(distanceM) || !Number.isFinite(costS)) continue;
+        adjacency[from].push({ to, distanceM, costS });
+    }
+    return adjacency;
+}
+
+function getOfflineGridKey(lng, lat) {
+    const x = Math.floor(lng / OFFLINE_ROUTING_GRID_SIZE_DEG);
+    const y = Math.floor(lat / OFFLINE_ROUTING_GRID_SIZE_DEG);
+    return `${x}:${y}`;
+}
+
+function buildOfflineRoutingSpatialIndex(nodes) {
+    const grid = new Map();
+    for (let i = 0; i < nodes.length; i += 1) {
+        const node = nodes[i];
+        if (!Array.isArray(node) || node.length < 2) continue;
+        const key = getOfflineGridKey(node[0], node[1]);
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(i);
+    }
+    return grid;
+}
+
+function makeOfflineGraphMode(edges, nodeCount) {
+    return {
+        edges,
+        adjacency: buildOfflineRoutingAdjacency(edges, nodeCount)
+    };
+}
+
+async function loadOfflineRoutingGraph() {
+    if (offlineRoutingGraphState) return offlineRoutingGraphState;
+    if (offlineRoutingGraphPromise) return offlineRoutingGraphPromise;
+
+    offlineRoutingGraphPromise = (async () => {
+        const response = await fetch(OFFLINE_ROUTING_GRAPH_PATH);
+        if (!response.ok) {
+            throw new Error(`Offline graph fetch failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+        const drivingEdges = payload.graphs && Array.isArray(payload.graphs.driving) ? payload.graphs.driving : [];
+        const walkingEdges = payload.graphs && Array.isArray(payload.graphs.walking) ? payload.graphs.walking : [];
+
+        if (!nodes.length || (!drivingEdges.length && !walkingEdges.length)) {
+            throw new Error('Offline graph is empty or invalid');
+        }
+
+        offlineRoutingGraphState = {
+            nodes,
+            spatialIndex: buildOfflineRoutingSpatialIndex(nodes),
+            modes: {
+                driving: makeOfflineGraphMode(drivingEdges, nodes.length),
+                walking: makeOfflineGraphMode(walkingEdges, nodes.length)
+            }
+        };
+
+        return offlineRoutingGraphState;
+    })();
+
+    try {
+        return await offlineRoutingGraphPromise;
+    } finally {
+        offlineRoutingGraphPromise = null;
+    }
+}
+
+function findNearestGraphNodeIndex(coords, graphState) {
+    const lng = coords[0];
+    const lat = coords[1];
+    const cellX = Math.floor(lng / OFFLINE_ROUTING_GRID_SIZE_DEG);
+    const cellY = Math.floor(lat / OFFLINE_ROUTING_GRID_SIZE_DEG);
+
+    let bestIndex = null;
+    let bestDistance = Infinity;
+
+    for (let ring = 0; ring <= OFFLINE_ROUTING_MAX_SNAP_RINGS; ring += 1) {
+        const minX = cellX - ring;
+        const maxX = cellX + ring;
+        const minY = cellY - ring;
+        const maxY = cellY + ring;
+
+        for (let x = minX; x <= maxX; x += 1) {
+            for (let y = minY; y <= maxY; y += 1) {
+                const isBorder = ring === 0 || x === minX || x === maxX || y === minY || y === maxY;
+                if (!isBorder) continue;
+
+                const key = `${x}:${y}`;
+                const nodeIndexes = graphState.spatialIndex.get(key);
+                if (!nodeIndexes) continue;
+
+                for (const nodeIndex of nodeIndexes) {
+                    const nodeCoords = graphState.nodes[nodeIndex];
+                    const distanceM = haversineMeters(coords, nodeCoords);
+                    if (distanceM < bestDistance) {
+                        bestDistance = distanceM;
+                        bestIndex = nodeIndex;
+                    }
+                }
+            }
+        }
+
+        if (bestIndex !== null && bestDistance <= OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M) {
+            return { nodeIndex: bestIndex, distanceM: bestDistance };
+        }
+    }
+
+    if (bestIndex !== null) {
+        return { nodeIndex: bestIndex, distanceM: bestDistance };
+    }
+
+    return null;
+}
+
+class MinHeap {
+    constructor() {
+        this.items = [];
+    }
+
+    get size() {
+        return this.items.length;
+    }
+
+    push(item) {
+        this.items.push(item);
+        this.bubbleUp(this.items.length - 1);
+    }
+
+    pop() {
+        if (!this.items.length) return null;
+        const first = this.items[0];
+        const last = this.items.pop();
+        if (this.items.length && last) {
+            this.items[0] = last;
+            this.bubbleDown(0);
+        }
+        return first;
+    }
+
+    bubbleUp(index) {
+        while (index > 0) {
+            const parent = Math.floor((index - 1) / 2);
+            if (this.items[parent].priority <= this.items[index].priority) break;
+            const tmp = this.items[parent];
+            this.items[parent] = this.items[index];
+            this.items[index] = tmp;
+            index = parent;
+        }
+    }
+
+    bubbleDown(index) {
+        const length = this.items.length;
+        while (true) {
+            let smallest = index;
+            const left = (2 * index) + 1;
+            const right = (2 * index) + 2;
+
+            if (left < length && this.items[left].priority < this.items[smallest].priority) {
+                smallest = left;
+            }
+            if (right < length && this.items[right].priority < this.items[smallest].priority) {
+                smallest = right;
+            }
+            if (smallest === index) break;
+
+            const tmp = this.items[index];
+            this.items[index] = this.items[smallest];
+            this.items[smallest] = tmp;
+            index = smallest;
+        }
+    }
+}
+
+function runOfflineAStar(graphState, modeKey, startIndex, endIndex) {
+    const mode = graphState.modes[modeKey];
+    if (!mode) throw new Error(`Unsupported offline mode: ${modeKey}`);
+
+    const nodeCount = graphState.nodes.length;
+    const bestCost = new Array(nodeCount).fill(Infinity);
+    const bestDistance = new Array(nodeCount).fill(Infinity);
+    const previous = new Array(nodeCount).fill(-1);
+    const heap = new MinHeap();
+
+    bestCost[startIndex] = 0;
+    bestDistance[startIndex] = 0;
+    heap.push({ node: startIndex, priority: 0 });
+
+    while (heap.size > 0) {
+        const current = heap.pop();
+        if (!current) break;
+        const currentNode = current.node;
+
+        if (currentNode === endIndex) break;
+        if (current.priority > bestCost[currentNode] + 1e-9) continue;
+
+        const neighbors = mode.adjacency[currentNode];
+        for (const edge of neighbors) {
+            const nextNode = edge.to;
+            const nextCost = bestCost[currentNode] + edge.costS;
+            if (nextCost >= bestCost[nextNode]) continue;
+
+            bestCost[nextNode] = nextCost;
+            bestDistance[nextNode] = bestDistance[currentNode] + edge.distanceM;
+            previous[nextNode] = currentNode;
+
+            const heuristic = haversineMeters(graphState.nodes[nextNode], graphState.nodes[endIndex]) / OFFLINE_ROUTING_HEURISTIC_SPEED_MPS;
+            heap.push({ node: nextNode, priority: nextCost + heuristic });
+        }
+    }
+
+    if (!Number.isFinite(bestCost[endIndex])) {
+        return null;
+    }
+
+    const nodePath = [];
+    let cursor = endIndex;
+    while (cursor !== -1) {
+        nodePath.push(cursor);
+        if (cursor === startIndex) break;
+        cursor = previous[cursor];
+    }
+
+    if (!nodePath.length || nodePath[nodePath.length - 1] !== startIndex) {
+        return null;
+    }
+
+    nodePath.reverse();
+
+    return {
+        nodePath,
+        distanceM: bestDistance[endIndex],
+        durationS: bestCost[endIndex]
+    };
+}
+
+async function buildOfflineGraphRoute(startCoords, endCoords, modeKey) {
+    const graphState = await loadOfflineRoutingGraph();
+    const startSnap = findNearestGraphNodeIndex(startCoords, graphState);
+    const endSnap = findNearestGraphNodeIndex(endCoords, graphState);
+
+    if (!startSnap || !endSnap) {
+        throw new Error('Could not snap route endpoints to offline graph nodes');
+    }
+
+    if (
+        startSnap.distanceM > OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M ||
+        endSnap.distanceM > OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M
+    ) {
+        throw new Error('Route endpoints are too far from the offline graph');
+    }
+
+    const solved = runOfflineAStar(graphState, modeKey, startSnap.nodeIndex, endSnap.nodeIndex);
+    if (!solved) {
+        throw new Error('Offline graph route was not found');
+    }
+
+    const lineCoords = solved.nodePath.map((nodeIndex) => graphState.nodes[nodeIndex]);
+    if (lineCoords.length < 2) {
+        throw new Error('Offline graph route is too short');
+    }
+
+    return {
+        geometry: {
+            type: 'LineString',
+            coordinates: lineCoords
+        },
+        distanceKm: solved.distanceM / 1000,
+        durationMin: solved.durationS / 60
+    };
+}
+
 async function calculateRoute() {
     if (!currentPos || !mapLoaded) return;
     const category = activeCategory;
@@ -2020,10 +2326,43 @@ async function calculateRoute() {
         profile = 'foot';
     }
 
-    const setRouteResult = (distanceKm, durationMin, destinationLabel, isFallback) => {
+    const offlineAtRequest = !hasInternetConnectivity();
+
+    const setRouteResult = (distanceKm, durationMin, destinationLabel, isFallback, fallbackLabel = 'offline estimate') => {
         document.getElementById('result-area').style.display = 'block';
-        document.getElementById('res-info').innerText = `${Math.round(durationMin)} min  /  ${distanceKm.toFixed(1)} km`;
-        document.getElementById('res-dest').innerHTML = `To: <b>${destinationLabel}</b>${isFallback ? ' (offline estimate)' : ''}`;
+        document.getElementById('res-info').innerText = `${Math.round(durationMin)} min  ·  ${distanceKm.toFixed(1)} km`;
+        document.getElementById('res-dest').innerHTML = `To: <b>${destinationLabel}</b>${isFallback ? ` (${fallbackLabel})` : ''}`;
+    };
+
+    const showDestinationMarker = () => {
+        if (destinationMarker) destinationMarker.remove();
+        const destEl = document.createElement('div');
+        destEl.className = 'destination-marker-el';
+        const catColors = { tilfluktsrom: '#f59e0b', brannstasjoner: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
+        const catIcons = { tilfluktsrom: 'fa-shield-halved', brannstasjoner: 'fa-fire-extinguisher', sykehus: 'fa-hospital', drikkevann: 'fa-droplet' };
+        const iconColor = catColors[category] || '#374151';
+        const iconName = catIcons[category] || 'fa-location-dot';
+        destEl.innerHTML = `<div style="background:white;border:3px solid ${iconColor};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);"><i class="fa-solid ${iconName}" style="color:${iconColor};font-size:16px;"></i></div>`;
+        destinationMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
+            .setLngLat(destCoords)
+            .addTo(map);
+    };
+
+    const fitRoute = (geometry, padding = 60) => {
+        const bounds = new maplibregl.LngLatBounds();
+        geometry.coordinates.forEach(c => bounds.extend(c));
+        map.fitBounds(bounds, buildViewModeCameraOptions({ padding }));
+    };
+
+    const tryOfflineGraphRoute = async () => {
+        const modeKey = transportMode === 'walking' ? 'walking' : 'driving';
+        const offlineRoute = await buildOfflineGraphRoute(currentPos, destCoords, modeKey);
+        map.getSource('route').setData(offlineRoute.geometry);
+        fitRoute(offlineRoute.geometry, 50);
+        showDestinationMarker();
+
+        const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
+        setRouteResult(offlineRoute.distanceKm, offlineRoute.durationMin, destName, true, 'offline graph');
     };
 
     const setStraightLineRoute = () => {
@@ -2035,41 +2374,40 @@ async function calculateRoute() {
         const durationMin = (distanceKm / speed) * 60;
         const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
 
-        const bounds = new maplibregl.LngLatBounds();
-        line.geometry.coordinates.forEach(c => bounds.extend(c));
-        map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 50 }));
+        fitRoute(line.geometry, 50);
+        showDestinationMarker();
         setRouteResult(distanceKm, durationMin, destName, true);
     };
 
-    if (!hasInternetConnectivity()) {
-        setStraightLineRoute();
-        showStatusMessage('Offline: showing straight-line estimate. Turn-by-turn routing needs internet (OSRM).', 'warn', 6000);
-        return;
+    if (offlineAtRequest) {
+        try {
+            await tryOfflineGraphRoute();
+            showStatusMessage('Offline: route calculated from local road graph.', 'info', 5000);
+            return;
+        } catch (offlineError) {
+            console.warn('Offline graph routing failed:', offlineError);
+            setStraightLineRoute();
+            showStatusMessage('Offline: no local route was found, so a straight-line estimate is shown.', 'warn', 6000);
+            return;
+        }
     }
 
     try {
-        const res = await fetch(`${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`);
+        const routeRequestUrl = `${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`;
+        const res = await fetch(routeRequestUrl);
+
+        if (!res.ok) {
+            throw new Error(`Routing request failed with status ${res.status}`);
+        }
+
         const json = await res.json();
 
         if (json.routes && json.routes.length > 0) {
             const route = json.routes[0];
             map.getSource('route').setData(route.geometry);
 
-            const bounds = new maplibregl.LngLatBounds();
-            route.geometry.coordinates.forEach(c => bounds.extend(c));
-            map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 60 }));
-
-            if (destinationMarker) destinationMarker.remove();
-            const destEl = document.createElement('div');
-            destEl.className = 'destination-marker-el';
-            const catColors = { tilfluktsrom: '#f59e0b', brannstasjoner: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
-            const catIcons = { tilfluktsrom: 'fa-shield-halved', brannstasjoner: 'fa-fire-extinguisher', sykehus: 'fa-hospital', drikkevann: 'fa-droplet' };
-            const iconColor = catColors[category] || '#374151';
-            const iconName = catIcons[category] || 'fa-location-dot';
-            destEl.innerHTML = `<div style="background:white;border:3px solid ${iconColor};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);"><i class="fa-solid ${iconName}" style="color:${iconColor};font-size:16px;"></i></div>`;
-            destinationMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
-                .setLngLat(destCoords)
-                .addTo(map);
+            fitRoute(route.geometry, 60);
+            showDestinationMarker();
 
             const mins = Math.round(route.duration / 60);
             const km = (route.distance / 1000).toFixed(1);
@@ -2080,14 +2418,20 @@ async function calculateRoute() {
             const t = TRANSLATIONS[currentLang];
             const fromLabel = pinpointMarker ? `<span style="font-size:11px;color:#6b7280;font-weight:600;"><i class="fa-solid fa-map-pin" style="color:#e11d48;margin-right:3px;"></i>${t.resultFrom}</span><br>` : '';
             document.getElementById('res-dest').innerHTML = `${fromLabel}${t.resultTo} <b>${destName}</b>`;
-        } else {
-            setStraightLineRoute();
-            showStatusMessage('Routing service returned no route. Showing straight-line estimate.', 'warn', 6000);
+            return;
         }
+
+        throw new Error('No route returned');
     } catch (err) {
         console.error("Routing error:", err);
-        setStraightLineRoute();
-        showStatusMessage('Routing service unavailable. Showing straight-line estimate from cached data.', 'warn', 6000);
+        try {
+            await tryOfflineGraphRoute();
+            showStatusMessage('Online routing unavailable, used local offline road graph.', 'warn', 6000);
+        } catch (offlineError) {
+            console.warn('Offline graph fallback after online routing failure also failed:', offlineError);
+            setStraightLineRoute();
+            showStatusMessage('Routing unavailable, showing straight-line estimate.', 'warn', 6000);
+        }
     }
 }
 

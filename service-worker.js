@@ -5,6 +5,7 @@ const APP_SHELL_ASSETS = [
   '/app.js',
   '/manifest.webmanifest',
   '/icons/pwa-icon.svg',
+  '/data/routing/agder-routing-graph.json',
   '/data/datasett/tilfluktsrom.geojson',
   '/data/datasett/brannstasjoner.geojson',
   '/data/datasett/drikkevann.geojson',
