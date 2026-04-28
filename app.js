@@ -1,3 +1,208 @@
+// --- TRANSLATIONS ---
+const TRANSLATIONS = {
+    en: {
+        searchPlaceholder: 'Search address...',
+        chipDrinkingWater: 'Drinking Water',
+        chipFireStations: 'Fire Stations',
+        chipHospitals: 'Hospitals',
+        chipShelters: 'Shelters',
+        advanced: 'Advanced',
+        view2d: '2D Map',
+        viewTerrain: '3D Terrain',
+        view3d: '3D City',
+        view3dLoading: 'Loading 3D...',
+        languageLabel: 'Language',
+        findNearest: 'Find nearest',
+        catShelter: 'Shelter',
+        catHospital: 'Hospital',
+        catFireStation: 'Fire Station',
+        catWater: 'Water',
+        modeWalk: 'Walk',
+        modeDrive: 'Drive',
+        resultLabel: 'Distance / Time',
+        resultTo: 'To:',
+        resultFrom: 'From pin',
+        findAllInRange: 'Find all within range',
+        clickToSearch: 'Click map to search',
+        clickModeOn: 'Click mode ON – click map',
+        pinpointMode: 'Pin location → route',
+        pinpointModeOn: 'Tap map to drop pin',
+        clearRoute: 'Clear',
+        layers: 'Layers',
+        noResults: 'No resources found within radius.',
+        resourcesWithin: 'resource(s) within',
+        meters: 'm',
+    },
+    no: {
+        searchPlaceholder: 'Søk etter adresse...',
+        chipDrinkingWater: 'Drikkevann',
+        chipFireStations: 'Brannstasjoner',
+        chipHospitals: 'Sykehus',
+        chipShelters: 'Tilfluktsrom',
+        advanced: 'Avansert',
+        view2d: '2D-kart',
+        viewTerrain: '3D-terreng',
+        view3d: '3D-by',
+        view3dLoading: 'Laster 3D...',
+        languageLabel: 'Språk',
+        findNearest: 'Finn nærmeste',
+        catShelter: 'Tilfluktsrom',
+        catHospital: 'Sykehus',
+        catFireStation: 'Brannstasjon',
+        catWater: 'Vann',
+        modeWalk: 'Gå',
+        modeDrive: 'Kjør',
+        resultLabel: 'Avstand / Tid',
+        resultTo: 'Til:',
+        resultFrom: 'Fra pin',
+        findAllInRange: 'Finn alle i nærheten',
+        clickToSearch: 'Klikk på kartet for å søke',
+        clickModeOn: 'Klikkemodus PÅ – klikk på kart',
+        pinpointMode: 'Fest pin → rute',
+        pinpointModeOn: 'Trykk på kartet for å feste pin',
+        clearRoute: 'Fjern',
+        layers: 'Lag',
+        noResults: 'Ingen ressurser funnet innenfor radius.',
+        resourcesWithin: 'ressurs(er) innenfor',
+        meters: 'm',
+    },
+    de: {
+        searchPlaceholder: 'Adresse suchen...',
+        chipDrinkingWater: 'Trinkwasser',
+        chipFireStations: 'Feuerwehrstationen',
+        chipHospitals: 'Krankenhäuser',
+        chipShelters: 'Schutzräume',
+        advanced: 'Erweitert',
+        view2d: '2D-Karte',
+        viewTerrain: '3D-Gelände',
+        view3d: '3D-Stadt',
+        view3dLoading: 'Lädt 3D...',
+        languageLabel: 'Sprache',
+        findNearest: 'Nächste finden',
+        catShelter: 'Schutzraum',
+        catHospital: 'Krankenhaus',
+        catFireStation: 'Feuerwehr',
+        catWater: 'Wasser',
+        modeWalk: 'Zu Fuß',
+        modeDrive: 'Fahren',
+        resultLabel: 'Entfernung / Zeit',
+        resultTo: 'Nach:',
+        resultFrom: 'Von Pin',
+        findAllInRange: 'Alle im Umkreis finden',
+        clickToSearch: 'Karte klicken zum Suchen',
+        clickModeOn: 'Klickmodus AN – Karte klicken',
+        pinpointMode: 'Pin setzen → Route',
+        pinpointModeOn: 'Karte tippen für Pin',
+        clearRoute: 'Löschen',
+        layers: 'Ebenen',
+        noResults: 'Keine Ressourcen im Radius gefunden.',
+        resourcesWithin: 'Ressource(n) innerhalb',
+        meters: 'm',
+    },
+    fr: {
+        searchPlaceholder: 'Rechercher une adresse...',
+        chipDrinkingWater: 'Eau potable',
+        chipFireStations: 'Casernes de pompiers',
+        chipHospitals: 'Hôpitaux',
+        chipShelters: 'Abris',
+        advanced: 'Avancé',
+        view2d: 'Carte 2D',
+        viewTerrain: 'Terrain 3D',
+        view3d: 'Ville 3D',
+        view3dLoading: 'Chargement 3D...',
+        languageLabel: 'Langue',
+        findNearest: 'Trouver le plus proche',
+        catShelter: 'Abri',
+        catHospital: 'Hôpital',
+        catFireStation: 'Pompiers',
+        catWater: 'Eau',
+        modeWalk: 'Marcher',
+        modeDrive: 'Conduire',
+        resultLabel: 'Distance / Temps',
+        resultTo: 'Vers:',
+        resultFrom: 'Depuis pin',
+        findAllInRange: 'Trouver tous dans le rayon',
+        clickToSearch: 'Cliquer sur la carte',
+        clickModeOn: 'Mode clic ACTIF – cliquer sur la carte',
+        pinpointMode: 'Épingler → itinéraire',
+        pinpointModeOn: 'Toucher la carte pour épingler',
+        clearRoute: 'Effacer',
+        layers: 'Couches',
+        noResults: 'Aucune ressource trouvée dans le rayon.',
+        resourcesWithin: 'ressource(s) dans',
+        meters: 'm',
+    },
+    uk: {
+        searchPlaceholder: 'Пошук адреси...',
+        chipDrinkingWater: 'Питна вода',
+        chipFireStations: 'Пожежні станції',
+        chipHospitals: 'Лікарні',
+        chipShelters: 'Укриття',
+        advanced: 'Розширений',
+        view2d: '2D-карта',
+        viewTerrain: '3D-рельєф',
+        view3d: '3D-місто',
+        view3dLoading: 'Завантаження 3D...',
+        languageLabel: 'Мова',
+        findNearest: 'Знайти найближче',
+        catShelter: 'Укриття',
+        catHospital: 'Лікарня',
+        catFireStation: 'Пожежна',
+        catWater: 'Вода',
+        modeWalk: 'Пішки',
+        modeDrive: 'Їхати',
+        resultLabel: 'Відстань / Час',
+        resultTo: 'До:',
+        resultFrom: 'Від піна',
+        findAllInRange: 'Знайти всіх у радіусі',
+        clickToSearch: 'Клікніть на карті для пошуку',
+        clickModeOn: 'Режим кліку УВІМК – клікніть на карті',
+        pinpointMode: 'Пін → маршрут',
+        pinpointModeOn: 'Натисніть карту для піна',
+        clearRoute: 'Очистити',
+        layers: 'Шари',
+        noResults: 'Ресурсів у радіусі не знайдено.',
+        resourcesWithin: 'ресурс(ів) у межах',
+        meters: 'м',
+    }
+};
+
+let currentLang = 'en';
+
+function setLanguage(lang) {
+    if (!TRANSLATIONS[lang]) return;
+    currentLang = lang;
+    const t = TRANSLATIONS[lang];
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        if (t[key] !== undefined) el.textContent = t[key];
+    });
+
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.dataset.i18nPlaceholder;
+        if (t[key] !== undefined) el.placeholder = t[key];
+    });
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+    });
+
+    const clickBtn = document.getElementById('btn-click-mode');
+    if (clickBtn) {
+        clickBtn.innerHTML = clickModeActive
+            ? `<i class="fa-solid fa-circle-xmark"></i> ${t.clickModeOn}`
+            : `<i class="fa-solid fa-crosshairs"></i> ${t.clickToSearch}`;
+    }
+
+    const pinBtn = document.getElementById('btn-pinpoint-mode');
+    if (pinBtn) {
+        pinBtn.innerHTML = pinpointModeActive
+            ? `<i class="fa-solid fa-circle-xmark"></i> <span>${t.pinpointModeOn}</span>`
+            : `<i class="fa-solid fa-map-pin"></i> <span>${t.pinpointMode}</span>`;
+    }
+}
+
 // --- SUPABASE KONFIGURASJON ---
 const SUPABASE_URL = 'https://wqfpqpvdicvejbvnplcf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxZnBxcHZkaWN2ZWpidm5wbGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMDMyMzEsImV4cCI6MjA4NTc3OTIzMX0.S7Hl1YuOmzN6VpZTUnHus1PGUNb8r7bWGdcDdubys9o';
@@ -14,10 +219,6 @@ let dataCache = {
     brannstasjoner: null,
     drikkevann: null,
     sykehus: null
-};
-const VIEW_MODE = {
-    MAP_2D: '2d',
-    CITY_3D: '3d'
 };
 const NORWAY_3D_SOURCE_ID = 'norway-3d-buildings-source';
 const NORWAY_3D_LAYER_ID = 'norway-3d-buildings-layer';
@@ -38,7 +239,9 @@ const NORWAY_3D_CAMERA = {
     bearing: -18
 };
 const MIN_3D_BUILDING_ZOOM = 14.2;
-let currentViewMode = VIEW_MODE.MAP_2D;
+let terrainActive = false;
+let city3DActive = false;
+let activeCategory = 'tilfluktsrom';
 let viewStateBefore3D = null;
 const norway3DBuildingCache = new Map();
 let current3DBuildingAreaKey = null;
@@ -132,24 +335,28 @@ const mapStyle = {
             'type': 'raster',
             'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
             'tileSize': 256,
+            'maxzoom': 19,
             'attribution': '&copy; OpenStreetMap Contributors'
         },
         'kartverket-topo': {
             'type': 'raster',
             'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
             'tileSize': 256,
+            'maxzoom': 20,
             'attribution': '&copy; Kartverket'
         },
         'kartverket-farger': {
             'type': 'raster',
             'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
             'tileSize': 256,
+            'maxzoom': 20,
             'attribution': '&copy; Kartverket'
         },
         'kartverket-graatone': {
             'type': 'raster',
             'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
             'tileSize': 256,
+            'maxzoom': 20,
             'attribution': '&copy; Kartverket'
         }
     },
@@ -157,28 +364,24 @@ const mapStyle = {
         {
             'id': 'osm-layer',
             'type': 'raster',
-            'source': 'osm',
-            'minzoom': 0, 'maxzoom': 19
+            'source': 'osm'
         },
         {
             'id': 'kartverket-topo-layer',
             'type': 'raster',
             'source': 'kartverket-topo',
-            'minzoom': 0, 'maxzoom': 20,
             'layout': { 'visibility': 'none' }
         },
         {
             'id': 'kartverket-farger-layer',
             'type': 'raster',
             'source': 'kartverket-farger',
-            'minzoom': 0, 'maxzoom': 20,
             'layout': { 'visibility': 'none' }
         },
         {
             'id': 'kartverket-graatone-layer',
             'type': 'raster',
             'source': 'kartverket-graatone',
-            'minzoom': 0, 'maxzoom': 20,
             'layout': { 'visibility': 'none' }
         }
     ]
@@ -204,14 +407,18 @@ map.on('load', async () => {
     map.addSource('sentinel2-source', {
         type: 'raster',
         tiles: ['https://wms.geonorge.no/skwms1/wms.sentinel2?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=2025'],
-        tileSize: 256
+        tileSize: 256,
+        maxzoom: 14
     });
     map.addLayer({ id: 'sentinel2-layer', type: 'raster', source: 'sentinel2-source', layout: { visibility: 'none' } });
 
+    // Flybilder — høyoppløselig flyfoto via Esri World Imagery, brukes ved høy zoom
     map.addSource('ortofoto-source', {
         type: 'raster',
-        tiles: ['https://wms.geonorge.no/skwms1/wms.nib?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=norgeibilder'],
-        tileSize: 256
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        maxzoom: 17,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS'
     });
     map.addLayer({ id: 'ortofoto-layer', type: 'raster', source: 'ortofoto-source', layout: { visibility: 'none' } });
 
@@ -313,38 +520,19 @@ map.on('load', async () => {
     // 4. Rute-lag (tomt foreløpig) - bruk FeatureCollection som utgangspunkt
     map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
+        id: 'route-layer-casing',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.8 }
+    });
+    map.addLayer({
         id: 'route-layer',
         type: 'line',
         source: 'route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.8 }
+        paint: { 'line-color': '#1d4ed8', 'line-width': 5, 'line-opacity': 0.95 }
     });
-
-    // Satellitt-toggle-logikk med zoom-basert bytte
-    let satelliteActive = false;
-
-    function updateSatelliteLayers() {
-        if (!satelliteActive) {
-            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
-            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
-            return;
-        }
-        if (map.getZoom() >= 14) {
-            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
-            map.setLayoutProperty('ortofoto-layer', 'visibility', 'visible');
-        } else {
-            map.setLayoutProperty('sentinel2-layer', 'visibility', 'visible');
-            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
-        }
-    }
-
-    document.getElementById('toggle-satellite').addEventListener('click', () => {
-        satelliteActive = !satelliteActive;
-        updateSatelliteLayers();
-        document.getElementById('toggle-satellite').textContent = satelliteActive ? 'Normal map' : 'Satellite';
-    });
-
-    map.on('zoom', updateSatelliteLayers);
 
     // Base map switcher
     const BASE_LAYERS = {
@@ -355,11 +543,53 @@ map.on('load', async () => {
     };
     let activeBaseMap = 'osm';
 
+    const FLYBILDER_ZOOM_THRESHOLD = 13;
+    const SATELLITE_MAX_ZOOM = 18;
+
+    function updateSatelliteLayers(isActive) {
+        if (!isActive) {
+            map.setLayoutProperty('sentinel2-layer', 'visibility', 'none');
+            map.setLayoutProperty('ortofoto-layer', 'visibility', 'none');
+            updateFlybilderBadge(false);
+            return;
+        }
+        const useFlybilder = map.getZoom() >= FLYBILDER_ZOOM_THRESHOLD;
+        map.setLayoutProperty('sentinel2-layer', 'visibility', useFlybilder ? 'none' : 'visible');
+        map.setLayoutProperty('ortofoto-layer', 'visibility', useFlybilder ? 'visible' : 'none');
+        updateFlybilderBadge(useFlybilder);
+    }
+
+    function updateFlybilderBadge(show) {
+        let badge = document.getElementById('flybilder-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'flybilder-badge';
+            badge.textContent = 'Flybilder';
+            badge.style.cssText = [
+                'position:absolute', 'bottom:40px', 'left:50%', 'transform:translateX(-50%)',
+                'background:rgba(26,115,232,0.88)', 'color:#fff', 'font-size:12px',
+                'font-weight:700', 'padding:4px 12px', 'border-radius:12px',
+                'pointer-events:none', 'z-index:1200', 'display:none',
+                'box-shadow:0 2px 8px rgba(0,0,0,0.22)', 'transition:opacity 0.3s ease',
+                'font-family:Inter,Arial,sans-serif'
+            ].join(';');
+            document.body.appendChild(badge);
+        }
+        badge.style.display = show ? 'block' : 'none';
+    }
+
     function switchBaseMap(key) {
         activeBaseMap = key;
+        const isSatellite = key === 'satellite';
         Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
-            map.setLayoutProperty(layerId, 'visibility', k === key ? 'visible' : 'none');
+            map.setLayoutProperty(layerId, 'visibility', (!isSatellite && k === key) ? 'visible' : 'none');
         });
+        if (isSatellite) {
+            map.setMaxZoom(SATELLITE_MAX_ZOOM);
+        } else {
+            map.setMaxZoom(22);
+        }
+        updateSatelliteLayers(isSatellite);
         document.querySelectorAll('#basemap-selector .basemap-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.basemap === key);
         });
@@ -369,17 +599,32 @@ map.on('load', async () => {
         btn.addEventListener('click', () => switchBaseMap(btn.dataset.basemap));
     });
 
+    map.on('zoom', () => {
+        if (activeBaseMap === 'satellite') updateSatelliteLayers(true);
+    });
+
+    // Terrain DEM source — AWS Terrain Tiles (Terrarium encoding, no API key needed)
+    map.addSource('terrain-dem', {
+        type: 'raster-dem',
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        encoding: 'terrarium'
+    });
+
     setupControls();
+    setTimeout(function () { if (typeof startInfoBarSync === 'function') startInfoBarSync(); }, 400);
 });
 // --- 2D / 3D VIEW MODE HELPERS ---
 function setupViewModeToggle() {
     const btn2D = document.getElementById('btn-view-2d');
     const btn3D = document.getElementById('btn-view-3d');
-    if (!btn2D || !btn3D || btn2D.dataset.bound === 'true') return;
+    const btnTerrain = document.getElementById('btn-view-terrain');
+    if (!btn2D || !btn3D || !btnTerrain || btn2D.dataset.bound === 'true') return;
 
     btn2D.dataset.bound = 'true';
     btn2D.addEventListener('click', restore2DMapView);
-    btn3D.addEventListener('click', () => { activate3DCityView(); });
+    btnTerrain.addEventListener('click', toggleTerrainView);
+    btn3D.addEventListener('click', toggle3DCityView);
     updateViewModeToggle(false);
 }
 
@@ -388,7 +633,7 @@ function setup3DViewTracking() {
 
     threeDViewTrackingBound = true;
     map.on('moveend', () => {
-        if (currentViewMode !== VIEW_MODE.CITY_3D || suppress3DBuildingRefresh) return;
+        if (!city3DActive || suppress3DBuildingRefresh) return;
 
         syncNorway3DBuildingsToCurrentView().catch(error => {
             console.warn('Could not refresh Norway 3D buildings after moving the map:', error);
@@ -399,16 +644,25 @@ function setup3DViewTracking() {
 function updateViewModeToggle(isLoading) {
     const btn2D = document.getElementById('btn-view-2d');
     const btn3D = document.getElementById('btn-view-3d');
-    if (!btn2D || !btn3D) return;
+    const btnTerrain = document.getElementById('btn-view-terrain');
+    if (!btn2D || !btn3D || !btnTerrain) return;
 
-    const in2D = currentViewMode === VIEW_MODE.MAP_2D;
+    const in2D = !terrainActive && !city3DActive;
+
     btn2D.classList.toggle('active', in2D);
-    btn3D.classList.toggle('active', !in2D);
+    btnTerrain.classList.toggle('active', terrainActive);
+    btn3D.classList.toggle('active', city3DActive);
+
     btn2D.setAttribute('aria-pressed', in2D ? 'true' : 'false');
-    btn3D.setAttribute('aria-pressed', in2D ? 'false' : 'true');
+    btnTerrain.setAttribute('aria-pressed', terrainActive ? 'true' : 'false');
+    btn3D.setAttribute('aria-pressed', city3DActive ? 'true' : 'false');
+
     btn2D.disabled = !!isLoading;
+    btnTerrain.disabled = !!isLoading;
     btn3D.disabled = !!isLoading;
-    btn3D.textContent = isLoading ? 'Loading 3D...' : '3D City';
+    btn3D.textContent = isLoading
+        ? TRANSLATIONS[currentLang].view3dLoading
+        : TRANSLATIONS[currentLang].view3d;
 }
 
 function readCameraState() {
@@ -423,7 +677,7 @@ function readCameraState() {
 
 function buildViewModeCameraOptions(baseOptions) {
     const options = { ...baseOptions };
-    if (currentViewMode === VIEW_MODE.CITY_3D) {
+    if (city3DActive) {
         if (typeof options.pitch !== 'number') options.pitch = map.getPitch();
         if (typeof options.bearing !== 'number') options.bearing = map.getBearing();
     }
@@ -448,7 +702,7 @@ function get3DActivationCenter() {
 }
 
 function getNorway3DInsertBeforeId() {
-    const candidates = ['tilfluktsrom-layer', 'brannstasjoner-layer', 'drikkevann-layer', 'sykehus-layer', 'route-layer'];
+    const candidates = ['tilfluktsrom-layer', 'brannstasjoner-layer', 'drikkevann-layer', 'sykehus-layer', 'route-layer-casing', 'route-layer'];
     return candidates.find(layerId => map.getLayer(layerId));
 }
 
@@ -707,7 +961,7 @@ async function loadNorway3DBuildingsForCenter(center, zoom = map.getZoom()) {
 }
 
 async function syncNorway3DBuildingsToCurrentView() {
-    if (currentViewMode !== VIEW_MODE.CITY_3D) return;
+    if (!city3DActive) return;
 
     const center = readCurrentMapCenter();
     if (!isCoordinateInNorway(center) || map.getZoom() < MIN_3D_BUILDING_ZOOM) {
@@ -719,8 +973,17 @@ async function syncNorway3DBuildingsToCurrentView() {
     setNorway3DLayerVisibility(true);
 }
 
-async function activate3DCityView() {
-    if (!mapLoaded || currentViewMode === VIEW_MODE.CITY_3D) return;
+async function toggle3DCityView() {
+    if (!mapLoaded) return;
+
+    if (city3DActive) {
+        city3DActive = false;
+        suppress3DBuildingRefresh = false;
+        setNorway3DLayerVisibility(false);
+        if (!terrainActive) map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+        updateViewModeToggle(false);
+        return;
+    }
 
     const targetCenter = get3DActivationCenter();
     if (!targetCenter) {
@@ -729,12 +992,12 @@ async function activate3DCityView() {
     }
 
     updateViewModeToggle(true);
-    // Save the exact 2D camera so the toggle can bring the user back to the same map view.
-    viewStateBefore3D = readCameraState();
+
+    if (!terrainActive && !city3DActive) viewStateBefore3D = readCameraState();
 
     try {
         await loadNorway3DBuildingsForCenter(targetCenter, NORWAY_3D_CAMERA.zoom);
-        currentViewMode = VIEW_MODE.CITY_3D;
+        city3DActive = true;
         setNorway3DLayerVisibility(true);
 
         suppress3DBuildingRefresh = true;
@@ -754,7 +1017,6 @@ async function activate3DCityView() {
             essential: true
         });
     } catch (error) {
-        viewStateBefore3D = null;
         console.error('Could not activate 3D city view:', error);
         alert('No 3D city buildings were found for that Norway location yet. Try zooming closer to a town or city and try again.');
     } finally {
@@ -763,9 +1025,8 @@ async function activate3DCityView() {
 }
 
 function restore2DMapView() {
-    if (!mapLoaded || currentViewMode === VIEW_MODE.MAP_2D) return;
+    if (!mapLoaded || (!terrainActive && !city3DActive)) return;
 
-    // If there is no saved camera yet, fall back to the original 2D Kristiansand view.
     const targetState = viewStateBefore3D || {
         center: [8.0182, 58.1467],
         zoom: 12,
@@ -773,9 +1034,14 @@ function restore2DMapView() {
         pitch: 0
     };
 
-    currentViewMode = VIEW_MODE.MAP_2D;
+    terrainActive = false;
+    city3DActive = false;
     suppress3DBuildingRefresh = false;
     setNorway3DLayerVisibility(false);
+
+    map.setTerrain(null);
+    if (map.getLayer('sky-layer')) map.removeLayer('sky-layer');
+
     map.flyTo({
         center: targetState.center,
         zoom: targetState.zoom,
@@ -786,9 +1052,63 @@ function restore2DMapView() {
     });
     updateViewModeToggle(false);
 }
+
+function toggleTerrainView() {
+    if (!mapLoaded) return;
+
+    if (terrainActive) {
+        terrainActive = false;
+        map.setTerrain(null);
+        if (!city3DActive) {
+            if (map.getLayer('sky-layer')) map.removeLayer('sky-layer');
+            map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+        }
+        updateViewModeToggle(false);
+        return;
+    }
+
+    if (!terrainActive && !city3DActive) viewStateBefore3D = readCameraState();
+
+    terrainActive = true;
+
+    // Set terrain and sky BEFORE flyTo — setting terrain mid-animation freezes the renderer
+    map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
+
+    if (!map.getLayer('sky-layer')) {
+        try {
+            map.addLayer({
+                id: 'sky-layer',
+                type: 'sky',
+                paint: {
+                    'sky-type': 'atmosphere',
+                    'sky-atmosphere-sun': [0.0, 90.0],
+                    'sky-atmosphere-sun-intensity': 15
+                }
+            });
+        } catch (e) { console.warn('sky layer not supported:', e); }
+    }
+
+    if (!city3DActive) {
+        const center = map.getCenter();
+        map.flyTo({
+            center: [center.lng, center.lat],
+            zoom: map.getZoom(),
+            pitch: 55,
+            bearing: -20,
+            duration: 1800,
+            essential: true
+        });
+    }
+
+    updateViewModeToggle(false);
+}
 let clickModeActive = false;
 let clickMarker = null;
 let nearbyMarkers = [];
+let pinpointModeActive = false;
+let pinpointMarker = null;
+let pinpointPopup = null;
+let destinationMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('radius-slider');
@@ -799,15 +1119,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn) btn.addEventListener('click', () => {
         clickModeActive = !clickModeActive;
         btn.classList.toggle('active', clickModeActive);
+        const t = TRANSLATIONS[currentLang];
         btn.innerHTML = clickModeActive
-            ? '<i class="fa-solid fa-circle-xmark"></i> Click mode ON – click map'
-            : '<i class="fa-solid fa-crosshairs"></i> Click map to search';
+            ? `<i class="fa-solid fa-circle-xmark"></i> ${t.clickModeOn}`
+            : `<i class="fa-solid fa-crosshairs"></i> ${t.clickToSearch}`;
         map.getCanvas().style.cursor = clickModeActive ? 'crosshair' : '';
         if (!clickModeActive) clearNearbyResults();
     });
 });
 
 map.on('click', async (e) => {
+    if (pinpointModeActive) {
+        setPinpointLocation([e.lngLat.lng, e.lngLat.lat]);
+        return;
+    }
     if (!clickModeActive) return;
     const lng = e.lngLat.lng;
     const lat = e.lngLat.lat;
@@ -853,7 +1178,7 @@ function renderNearbyResults(data) {
     const panel = document.getElementById('nearby-results');
     panel.style.display = 'block';
     if (!data || data.length === 0) {
-        panel.innerHTML = '<span style="color:#888;">No resources found within radius.</span>';
+        panel.innerHTML = `<span style="color:#888;">${TRANSLATIONS[currentLang].noResults}</span>`;
         return;
     }
     const colors = { tilfluktsrom: '#FFD700', brannstasjon: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
@@ -865,7 +1190,8 @@ function renderNearbyResults(data) {
     });
     const grouped = {};
     data.forEach(d => { if (!grouped[d.ressurs_type]) grouped[d.ressurs_type] = []; grouped[d.ressurs_type].push(d); });
-    let html = `<div style="font-weight:bold;margin-bottom:6px;">📍 ${data.length} resource(s) within ${document.getElementById('radius-slider').value} m:</div>`;
+    const _t = TRANSLATIONS[currentLang];
+    let html = `<div style="font-weight:bold;margin-bottom:6px;">📍 ${data.length} ${_t.resourcesWithin} ${document.getElementById('radius-slider').value} ${_t.meters}:</div>`;
     for (const [type, items] of Object.entries(grouped)) {
         html += `<div style="margin-top:5px;font-weight:bold;">${ikoner[type] || '📌'} ${type} (${items.length})</div>`;
         items.forEach(it => { html += `<div class="nearby-item" style="margin-left:14px;">${it.navn} <span style="color:#888;">– ${Math.round(it.distanse_m)} m</span></div>`; });
@@ -882,7 +1208,107 @@ function clearNearbyResults() {
     const panel = document.getElementById('nearby-results');
     if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
 }
+
+// ── PINPOINT ROUTING ────────────────────────────────────────────────────────
+
+function startPinpointMode() {
+    if (clickModeActive) {
+        clickModeActive = false;
+        const btn = document.getElementById('btn-click-mode');
+        if (btn) {
+            btn.classList.remove('active');
+            btn.innerHTML = `<i class="fa-solid fa-crosshairs"></i> ${TRANSLATIONS[currentLang].clickToSearch}`;
+        }
+        map.getCanvas().style.cursor = '';
+        clearNearbyResults();
+    }
+    pinpointModeActive = true;
+    const btn = document.getElementById('btn-pinpoint-mode');
+    if (btn) {
+        btn.classList.add('active');
+        btn.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <span>${TRANSLATIONS[currentLang].pinpointModeOn}</span>`;
+    }
+    map.getCanvas().style.cursor = 'crosshair';
+}
+
+function stopPinpointMode() {
+    pinpointModeActive = false;
+    map.getCanvas().style.cursor = '';
+    const btn = document.getElementById('btn-pinpoint-mode');
+    if (btn) {
+        btn.classList.remove('active');
+        btn.innerHTML = `<i class="fa-solid fa-map-pin"></i> <span>${TRANSLATIONS[currentLang].pinpointMode}</span>`;
+    }
+}
+
+function setPinpointLocation(coords) {
+    stopPinpointMode();
+    currentPos = coords;
+
+    if (userMarker) { userMarker.remove(); userMarker = null; }
+    if (pinpointMarker) { pinpointMarker.remove(); pinpointMarker = null; }
+
+    const lat = coords[1];
+    const lng = coords[0];
+    const latStr = (lat >= 0 ? lat.toFixed(5) + '° N' : Math.abs(lat).toFixed(5) + '° S');
+    const lngStr = (lng >= 0 ? lng.toFixed(5) + '° E' : Math.abs(lng).toFixed(5) + '° W');
+
+    const el = document.createElement('div');
+    el.className = 'pinpoint-marker-el';
+    el.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#e11d48;font-size:38px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));"></i>`;
+    pinpointMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat(coords)
+        .addTo(map);
+
+    if (pinpointPopup) { pinpointPopup.remove(); pinpointPopup = null; }
+    pinpointPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: [0, -48], className: 'pinpoint-coords-popup' })
+        .setLngLat(coords)
+        .setHTML(`${latStr}&nbsp;&nbsp;&nbsp;${lngStr}`)
+        .addTo(map);
+
+    calculateRoute();
+}
+
+function clearRoute() {
+    currentPos = null;
+    if (pinpointMarker) { pinpointMarker.remove(); pinpointMarker = null; }
+    if (pinpointPopup) { pinpointPopup.remove(); pinpointPopup = null; }
+    if (userMarker) { userMarker.remove(); userMarker = null; }
+    if (destinationMarker) { destinationMarker.remove(); destinationMarker = null; }
+    if (map.getSource('route')) {
+        map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+    }
+    const resultArea = document.getElementById('result-area');
+    if (resultArea) resultArea.style.display = 'none';
+    stopPinpointMode();
+}
 // ────────────────────────────────────────────────────────────────────────────
+
+// MOUSE COORDINATE DISPLAY + SCALE INDICATOR
+const mouseCoordsEl = document.getElementById('mouse-coords');
+const mapScaleEl = document.getElementById('map-scale');
+
+function updateMapScale() {
+    const zoom = map.getZoom();
+    const lat = map.getCenter().lat;
+    // metres per pixel at current zoom & latitude (Web Mercator)
+    const metersPerPixel = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    // assume 96 dpi screen → pixels per metre on screen
+    const scaleDenominator = Math.round(metersPerPixel * (96 * window.devicePixelRatio / 0.0254));
+    mapScaleEl.textContent = `Scale = 1:${scaleDenominator.toLocaleString()}`;
+}
+
+map.on('mousemove', (e) => {
+    const { lng, lat } = e.lngLat;
+    mouseCoordsEl.textContent = `Lat: ${lat.toFixed(5)}  Lng: ${lng.toFixed(5)}`;
+});
+map.on('mouseleave', () => {
+    mouseCoordsEl.textContent = 'Lat: —   Lng: —';
+});
+
+map.on('zoom', updateMapScale);
+map.on('move', updateMapScale);
+map.on('load', updateMapScale);
 
 // INTERACTION
 map.on('click', 'tilfluktsrom-layer', (e) => {
@@ -921,12 +1347,13 @@ function setupControls() {
     setupViewModeToggle();
     setup3DViewTracking();
 
-    // Find me
+    // Find me (hidden button, kept for JS compat)
     document.getElementById('btn-find-me').addEventListener('click', () => {
         if (!navigator.geolocation) return alert("No GPS support.");
         navigator.geolocation.getCurrentPosition(pos => {
-            setUserLocation([pos.coords.longitude, pos.coords.latitude]);
-        }, () => alert("Could not find position."));
+            setUserLocation([pos.coords.longitude, pos.coords.latitude], pos.coords.accuracy);
+        }, () => alert("Could not find position."),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     });
 
     // Zoom inn og ut (fra egendefinert 2x2 grid)
@@ -956,14 +1383,15 @@ function setupControls() {
         });
     }
 
-    // Finn min posisjon (kart-knapp)
+    // Locate button
     const btnLocate = document.getElementById('btn-locate');
     if (btnLocate) {
         btnLocate.addEventListener('click', () => {
             if (!navigator.geolocation) return alert("No GPS support.");
             navigator.geolocation.getCurrentPosition(pos => {
                 setUserLocation([pos.coords.longitude, pos.coords.latitude]);
-            }, () => alert("Could not find position."));
+            }, () => alert("Could not find position."),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
         });
     }
 
@@ -983,8 +1411,31 @@ function setupControls() {
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
 
-    // Dropdown & Toggles
-    document.getElementById('target-category').addEventListener('change', () => { if (currentPos) calculateRoute(); });
+    // Category buttons
+    document.querySelectorAll('.cat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeCategory = btn.dataset.category;
+            if (currentPos) calculateRoute();
+        });
+    });
+
+    // Language buttons
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+    });
+
+    // Advanced view toggle
+    const btnAdvanced = document.getElementById('btn-advanced-toggle');
+    const viewModePanel = document.getElementById('view-mode-toggle');
+    const advChevron = document.getElementById('advanced-chevron');
+    if (btnAdvanced && viewModePanel) {
+        btnAdvanced.addEventListener('click', () => {
+            const isOpen = viewModePanel.classList.toggle('open');
+            if (advChevron) advChevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+        });
+    }
 
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -995,12 +1446,25 @@ function setupControls() {
         });
     });
 
+    const btnPinpoint = document.getElementById('btn-pinpoint-mode');
+    if (btnPinpoint) {
+        btnPinpoint.addEventListener('click', () => {
+            if (pinpointModeActive) stopPinpointMode();
+            else startPinpointMode();
+        });
+    }
+
+    const btnClearRoute = document.getElementById('btn-clear-route');
+    if (btnClearRoute) {
+        btnClearRoute.addEventListener('click', clearRoute);
+    }
+
     // Layer Checkboxes
     const toggles = [
         { id: 'toggle-tilfluktsrom', layer: 'tilfluktsrom-layer' },
         { id: 'toggle-brannstasjoner', layer: 'brannstasjoner-layer' },
         { id: 'toggle-drikkevann', layer: 'drikkevann-layer' },
-        { id: 'toggle-sykehus', layer: 'sykehus-layer' }
+        { id: 'toggle-sykehus', layer: 'sykehus-layer' },
     ];
     toggles.forEach(t => {
         const el = document.getElementById(t.id);
@@ -1013,21 +1477,53 @@ function setupControls() {
 }
 
 // ROUTING LOGIC
-function setUserLocation(coords) {
+function updateAccuracyCircle(coords, accuracyMeters) {
+    const geojson = turf.circle(coords, accuracyMeters / 1000, { steps: 64, units: 'kilometers' });
+    if (map.getSource('accuracy-circle')) {
+        map.getSource('accuracy-circle').setData(geojson);
+    } else {
+        map.addSource('accuracy-circle', { type: 'geojson', data: geojson });
+        const beforeId = getNorway3DInsertBeforeId();
+        map.addLayer({
+            id: 'accuracy-circle-fill',
+            type: 'fill',
+            source: 'accuracy-circle',
+            paint: { 'fill-color': '#4285f4', 'fill-opacity': 0.12 }
+        }, beforeId);
+        map.addLayer({
+            id: 'accuracy-circle-border',
+            type: 'line',
+            source: 'accuracy-circle',
+            paint: { 'line-color': '#4285f4', 'line-width': 1.5, 'line-opacity': 0.55 }
+        }, beforeId);
+    }
+
+    // Show accuracy badge on the marker
+    const badge = document.getElementById('accuracy-badge');
+    if (badge) badge.textContent = `±${Math.round(accuracyMeters)} m`;
+}
+
+function setUserLocation(coords, accuracyMeters) {
     currentPos = coords;
     map.flyTo(buildViewModeCameraOptions({ center: coords, zoom: 14 }));
 
     if (userMarker) userMarker.remove();
     const el = document.createElement('div');
-    el.innerHTML = '<i class="fa-solid fa-circle-user" style="color:#2563eb; font-size:35px; background:white; border-radius:50%; box-shadow:0 0 5px rgba(0,0,0,0.3);"></i>';
-    userMarker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
+    el.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;';
+    el.innerHTML = `
+        <i class="fa-solid fa-circle-user" style="color:#2563eb;font-size:35px;background:white;border-radius:50%;box-shadow:0 0 5px rgba(0,0,0,0.3);"></i>
+        <span id="accuracy-badge" style="background:rgba(66,133,244,0.85);color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;white-space:nowrap;font-family:Inter,Arial,sans-serif;"></span>
+    `;
+    userMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat(coords).addTo(map);
+
+    if (accuracyMeters) updateAccuracyCircle(coords, accuracyMeters);
 
     calculateRoute();
 }
 
 async function calculateRoute() {
     if (!currentPos || !mapLoaded) return;
-    const category = document.getElementById('target-category').value;
+    const category = activeCategory;
     const targetData = dataCache[category];
 
     if (!targetData) return alert("Data not loaded yet.");
@@ -1056,13 +1552,29 @@ async function calculateRoute() {
 
             const bounds = new maplibregl.LngLatBounds();
             route.geometry.coordinates.forEach(c => bounds.extend(c));
-            map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 50 }));
+            map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 60 }));
 
+            if (destinationMarker) destinationMarker.remove();
+            const destEl = document.createElement('div');
+            destEl.className = 'destination-marker-el';
+            const catColors = { tilfluktsrom: '#f59e0b', brannstasjoner: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
+            const catIcons = { tilfluktsrom: 'fa-shield-halved', brannstasjoner: 'fa-fire-extinguisher', sykehus: 'fa-hospital', drikkevann: 'fa-droplet' };
+            const iconColor = catColors[category] || '#374151';
+            const iconName = catIcons[category] || 'fa-location-dot';
+            destEl.innerHTML = `<div style="background:white;border:3px solid ${iconColor};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);"><i class="fa-solid ${iconName}" style="color:${iconColor};font-size:16px;"></i></div>`;
+            destinationMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
+                .setLngLat(destCoords)
+                .addTo(map);
+
+            const mins = Math.round(route.duration / 60);
+            const km = (route.distance / 1000).toFixed(1);
             document.getElementById('result-area').style.display = 'block';
-            document.getElementById('res-info').innerText = `${Math.round(route.duration / 60)} min  /  ${(route.distance / 1000).toFixed(1)} km`;
+            document.getElementById('res-info').innerText = `${mins} min  ·  ${km} km`;
 
-            const destName = props.navn || props.adresse || props.brannstasjon || "Destination";
-            document.getElementById('res-dest').innerHTML = `To: <b>${destName}</b>`;
+            const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
+            const t = TRANSLATIONS[currentLang];
+            const fromLabel = pinpointMarker ? `<span style="font-size:11px;color:#6b7280;font-weight:600;"><i class="fa-solid fa-map-pin" style="color:#e11d48;margin-right:3px;"></i>${t.resultFrom}</span><br>` : '';
+            document.getElementById('res-dest').innerHTML = `${fromLabel}${t.resultTo} <b>${destName}</b>`;
         }
     } catch (err) { console.error("Routing error:", err); }
 }
