@@ -922,6 +922,7 @@ map.on('load', async () => {
     map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
         id: 'route-layer-casing',
+
         type: 'line',
         source: 'route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
@@ -934,6 +935,16 @@ map.on('load', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#1d4ed8', 'line-width': 5, 'line-opacity': 0.95 }
     });
+
+    // Pre-warm the offline routing graph in the background so it is ready when the
+    // user first requests a route (avoids a noticeable delay on first route request).
+    window.setTimeout(() => {
+        loadOfflineRoutingGraph().then(() => {
+            console.info('Offline routing graph pre-loaded successfully.');
+        }).catch((err) => {
+            console.warn('Offline routing graph pre-load failed (will retry on first route request):', err.message);
+        });
+    }, 3000); // slight delay so map data loads first
 
     // Base map switcher
     const BASE_LAYERS = {
@@ -2022,14 +2033,16 @@ function haversineMeters(pointA, pointB) {
     return 2 * radius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function buildOfflineRoutingAdjacency(edges, nodeCount) {
+function buildOfflineRoutingAdjacency(edges, nodeCount, walkingSpeedKmh) {
     const adjacency = Array.from({ length: nodeCount }, () => []);
+    // walkingSpeedKmh: if provided, override costS with distance-based walking time
+    const walkingCostFactor = walkingSpeedKmh ? (3600 / (walkingSpeedKmh * 1000)) : null;
     for (const edge of edges) {
         if (!Array.isArray(edge) || edge.length < 5) continue;
         const from = edge[0];
         const to = edge[1];
         const distanceM = edge[3];
-        const costS = edge[4];
+        const costS = walkingCostFactor !== null ? distanceM * walkingCostFactor : edge[4];
         if (!Number.isInteger(from) || !Number.isInteger(to)) continue;
         if (from < 0 || to < 0 || from >= nodeCount || to >= nodeCount) continue;
         if (!Number.isFinite(distanceM) || !Number.isFinite(costS)) continue;
@@ -2056,10 +2069,10 @@ function buildOfflineRoutingSpatialIndex(nodes) {
     return grid;
 }
 
-function makeOfflineGraphMode(edges, nodeCount) {
+function makeOfflineGraphMode(edges, nodeCount, walkingSpeedKmh) {
     return {
         edges,
-        adjacency: buildOfflineRoutingAdjacency(edges, nodeCount)
+        adjacency: buildOfflineRoutingAdjacency(edges, nodeCount, walkingSpeedKmh)
     };
 }
 
@@ -2114,9 +2127,9 @@ async function loadOfflineRoutingGraph() {
         const payload = await decodeJsonPayload();
         const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
         const drivingEdges = payload.graphs && Array.isArray(payload.graphs.driving) ? payload.graphs.driving : [];
-        const walkingEdges = payload.graphs && Array.isArray(payload.graphs.walking) ? payload.graphs.walking : [];
+        const walkingSpeedKmh = (payload.metadata && payload.metadata.walkingSpeedKmh) || 5.0;
 
-        if (!nodes.length || (!drivingEdges.length && !walkingEdges.length)) {
+        if (!nodes.length || !drivingEdges.length) {
             throw new Error('Offline graph is empty or invalid');
         }
 
@@ -2125,7 +2138,7 @@ async function loadOfflineRoutingGraph() {
             spatialIndex: buildOfflineRoutingSpatialIndex(nodes),
             modes: {
                 driving: makeOfflineGraphMode(drivingEdges, nodes.length),
-                walking: makeOfflineGraphMode(walkingEdges, nodes.length)
+                walking: makeOfflineGraphMode(drivingEdges, nodes.length, walkingSpeedKmh)
             }
         };
 
@@ -2436,7 +2449,14 @@ async function calculateRoute() {
 
     try {
         const routeRequestUrl = `${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`;
-        const res = await fetch(routeRequestUrl);
+        const osrmController = new AbortController();
+        const osrmTimeout = window.setTimeout(() => osrmController.abort(), 9000);
+        let res;
+        try {
+            res = await fetch(routeRequestUrl, { signal: osrmController.signal });
+        } finally {
+            window.clearTimeout(osrmTimeout);
+        }
 
         if (!res.ok) {
             throw new Error(`Routing request failed with status ${res.status}`);

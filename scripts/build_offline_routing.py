@@ -35,6 +35,11 @@ HIGHWAY_CODES = {
     'construction': 22,
 }
 
+# Keep only roads that are meaningful for emergency routing.
+# Residential/service streets are intentionally excluded to keep the graph small
+# enough for the browser to parse and run A* on efficiently.
+# Walking uses the same routable set — the difference in travel time is handled
+# via the speed profile, not a separate graph.
 DRIVING_HIGHWAYS = {
     'motorway',
     'motorway_link',
@@ -47,35 +52,10 @@ DRIVING_HIGHWAYS = {
     'tertiary',
     'tertiary_link',
     'unclassified',
-    'residential',
-    'living_street',
-    'service',
-    'road',
 }
 
-WALKING_HIGHWAYS = {
-    'motorway',
-    'motorway_link',
-    'trunk',
-    'trunk_link',
-    'primary',
-    'primary_link',
-    'secondary',
-    'secondary_link',
-    'tertiary',
-    'tertiary_link',
-    'unclassified',
-    'residential',
-    'living_street',
-    'service',
-    'road',
-    'track',
-    'pedestrian',
-    'path',
-    'footway',
-    'cycleway',
-    'steps',
-}
+# Walking reuses the driving set (emergency destinations are reachable on road network)
+WALKING_HIGHWAYS = DRIVING_HIGHWAYS
 
 DRIVING_SPEED_KMH = {
     1: 90,
@@ -315,7 +295,8 @@ def build_graph_from_pbf(pbf_path: Path, bounds: Bounds | None) -> dict[str, Any
 
     ordered_nodes = sorted(node_map.keys())
     node_index = {node_id: idx for idx, node_id in enumerate(ordered_nodes)}
-    nodes = [[node_map[node_id][0], node_map[node_id][1]] for node_id in ordered_nodes]
+    # Round to 5 decimal places (~1 m precision) — significantly reduces JSON size.
+    nodes = [[round(node_map[n][0], 5), round(node_map[n][1], 5)] for n in ordered_nodes]
 
     def build_edges(
         ways: list[WayData],
@@ -341,30 +322,36 @@ def build_graph_from_pbf(pbf_path: Path, bounds: Bounds | None) -> dict[str, Any
                 u = node_index[start_ref]
                 v = node_index[end_ref]
 
+                # Round distance/cost to integers — reduces JSON size while keeping
+                # sub-second accuracy (integer seconds is fine for routing).
+                dist_int = round(distance_m)
+                cost_int = round(cost_seconds)
+                if dist_int <= 0 or cost_int <= 0:
+                    continue
                 if mode == 'driving' and direction == -1:
-                    edges.append([v, u, highway_code, distance_m, cost_seconds])
+                    edges.append([v, u, highway_code, dist_int, cost_int])
                 elif mode == 'driving' and direction == 1:
-                    edges.append([u, v, highway_code, distance_m, cost_seconds])
+                    edges.append([u, v, highway_code, dist_int, cost_int])
                 else:
-                    edges.append([u, v, highway_code, distance_m, cost_seconds])
-                    edges.append([v, u, highway_code, distance_m, cost_seconds])
+                    edges.append([u, v, highway_code, dist_int, cost_int])
+                    edges.append([v, u, highway_code, dist_int, cost_int])
         return edges
 
+    # Build driving edges only — walking uses the same topology at fixed 5 km/h
+    # (computed at runtime in app.js). This halves the edge storage.
     driving_edges = build_edges(way_collector.driving_ways, DRIVING_SPEED_KMH, 'driving')
-    walking_edges = build_edges(way_collector.walking_ways, WALKING_SPEED_KMH, 'walking')
 
     return {
         'metadata': {
             'region': 'Agder',
             'nodeCount': len(nodes),
             'drivingEdgeCount': len(driving_edges),
-            'walkingEdgeCount': len(walking_edges),
+            'walkingSpeedKmh': 5.0,
         },
         'highwayCodes': HIGHWAY_CODES,
         'nodes': nodes,
         'graphs': {
             'driving': driving_edges,
-            'walking': walking_edges,
         },
     }
 
@@ -374,7 +361,7 @@ def main() -> None:
     parser.add_argument('--pbf', default='data/osm/sorlandet-260427.osm.pbf', help='Input OSM PBF file.')
     parser.add_argument('--region', default='data/datasett/agder_grense.geojson', help='GeoJSON file defining the routing area (bbox clip).')
     parser.add_argument('--output', default='data/routing/agder-routing-graph.json.gz', help='Output graph JSON file (.json or .json.gz).')
-    parser.add_argument('--buffer-degrees', type=float, default=0.06, help='Bounding-box buffer around the region in degrees.')
+    parser.add_argument('--buffer-degrees', type=float, default=0.03, help='Bounding-box buffer around the region in degrees.')
     parser.add_argument('--no-region-clip', action='store_true', help='Disable region clipping and build from whole PBF.')
     args = parser.parse_args()
 
