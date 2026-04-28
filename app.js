@@ -242,6 +242,7 @@ const MIN_3D_BUILDING_ZOOM = 14.2;
 let terrainActive = false;
 let city3DActive = false;
 let activeCategory = 'tilfluktsrom';
+const fullShelterIds = new Set();
 let viewStateBefore3D = null;
 const norway3DBuildingCache = new Map();
 let current3DBuildingAreaKey = null;
@@ -249,6 +250,62 @@ let pending3DBuildingAreaKey = null;
 let norway3DBuildingsPromise = null;
 let suppress3DBuildingRefresh = false;
 let threeDViewTrackingBound = false;
+// --- SHELTER FULL-STATUS HELPERS ---
+function getShelterId(props) {
+    return String(props.id || props.romnr || `${props.navn}_${props.adresse}`);
+}
+
+function showToast(message, duration = 4500) {
+    const existing = document.getElementById('reroute-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'reroute-toast';
+    toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#ef4444;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 14px rgba(0,0,0,0.35);max-width:340px;text-align:center;pointer-events:none;';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, duration);
+}
+
+function updateShelterFullOverlay() {
+    const cached = dataCache.tilfluktsrom;
+    if (!cached || !map || !map.getSource('tilfluktsrom-source')) return;
+    const updated = {
+        ...cached,
+        features: cached.features.map(f => ({
+            ...f,
+            properties: { ...f.properties, er_full: fullShelterIds.has(getShelterId(f.properties)) ? true : (f.properties.er_full || false) }
+        }))
+    };
+    map.getSource('tilfluktsrom-source').setData(updated);
+}
+
+function showShelterPopup(lngLat, props) {
+    const shelterId = getShelterId(props);
+    const isFull = fullShelterIds.has(shelterId) || !!props.er_full;
+    const plasser = props.plasser ? `<br><b>Capacity:</b> ${props.plasser}` : '';
+    const adresse = props.adresse ? `<br><b>Address:</b> ${props.adresse}` : '';
+    const fullBadge = isFull ? `<br><span style="color:#ef4444;font-weight:700;">⛔ FULL</span>` : '';
+    const btnLabel = isFull
+        ? (currentLang === 'no' ? 'Merk som ledig' : 'Mark as Available')
+        : (currentLang === 'no' ? 'Meld full' : 'Report Full');
+    const btnColor = isFull ? '#10b981' : '#ef4444';
+    const popup = new maplibregl.Popup()
+        .setLngLat(lngLat)
+        .setHTML(`<div style="min-width:150px;"><b>SHELTER</b>${adresse}${plasser}${fullBadge}<br><button id="toggle-full-btn" style="background:${btnColor};color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;margin-top:8px;font-size:12px;font-weight:600;width:100%;">${btnLabel}</button></div>`)
+        .addTo(map);
+    const btn = popup.getElement().querySelector('#toggle-full-btn');
+    if (btn) btn.addEventListener('click', () => {
+        if (fullShelterIds.has(shelterId)) {
+            fullShelterIds.delete(shelterId);
+        } else {
+            fullShelterIds.add(shelterId);
+        }
+        popup.remove();
+        updateShelterFullOverlay();
+        if (activeCategory === 'tilfluktsrom') calculateRoute();
+    });
+}
+
 // --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
 async function fetchGeoJSON(tableName) {
     console.log(`Henter data fra tabell: ${tableName}...`);
@@ -432,6 +489,10 @@ map.on('load', async () => {
         dataCache.tilfluktsrom = shelters;
         map.addSource('tilfluktsrom-source', { type: 'geojson', data: shelters });
 
+        shelters.features.forEach(f => {
+            if (f.properties.er_full) fullShelterIds.add(getShelterId(f.properties));
+        });
+
         if (iconLoaded) {
             map.addLayer({
                 id: 'tilfluktsrom-layer',
@@ -447,6 +508,20 @@ map.on('load', async () => {
                 paint: { 'circle-radius': 8, 'circle-color': '#FFD700', 'circle-stroke-width': 2, 'circle-stroke-color': '#000' }
             });
         }
+
+        map.addLayer({
+            id: 'tilfluktsrom-full-overlay',
+            type: 'circle',
+            source: 'tilfluktsrom-source',
+            filter: ['==', ['get', 'er_full'], true],
+            paint: {
+                'circle-radius': 13,
+                'circle-color': '#ef4444',
+                'circle-opacity': 0.8,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff'
+            }
+        });
     }
 
     // 2. Hent Brannstasjoner
@@ -1312,10 +1387,13 @@ map.on('load', updateMapScale);
 
 // INTERACTION
 map.on('click', 'tilfluktsrom-layer', (e) => {
-    const p = e.features[0].properties;
-    const plasser = p.plasser ? `<br><b>Capacity:</b> ${p.plasser}` : '';
-    const adresse = p.adresse ? `<br><b>Address:</b> ${p.adresse}` : '';
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>SHELTER</b>${adresse}${plasser}`).addTo(map);
+    showShelterPopup(e.lngLat, e.features[0].properties);
+});
+
+map.on('click', 'tilfluktsrom-full-overlay', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['tilfluktsrom-layer'] });
+    if (features.length > 0) showShelterPopup(e.lngLat, features[0].properties);
+    else showShelterPopup(e.lngLat, e.features[0].properties);
 });
 
 map.on('click', 'brannstasjoner-layer', (e) => {
@@ -1529,8 +1607,27 @@ async function calculateRoute() {
     if (!targetData) return alert("Data not loaded yet.");
 
     const userPoint = turf.point(currentPos);
-    const nearest = turf.nearestPoint(userPoint, targetData);
+
+    let routeData = targetData;
+    let reroutedFromFull = false;
+    if (category === 'tilfluktsrom' && fullShelterIds.size > 0) {
+        const absNearest = turf.nearestPoint(userPoint, targetData);
+        if (absNearest && fullShelterIds.has(getShelterId(absNearest.properties))) {
+            const available = targetData.features.filter(f => !fullShelterIds.has(getShelterId(f.properties)));
+            if (available.length > 0) {
+                routeData = { type: 'FeatureCollection', features: available };
+                reroutedFromFull = true;
+            }
+        }
+    }
+
+    const nearest = turf.nearestPoint(userPoint, routeData);
     if (!nearest) return;
+    if (reroutedFromFull) {
+        showToast(currentLang === 'no'
+            ? 'Nærmeste tilfluktsrom er fullt – omdirigerer til neste ledige.'
+            : 'Nearest shelter is full – rerouting to next available.');
+    }
 
     const destCoords = nearest.geometry.coordinates;
     const props = nearest.properties;
