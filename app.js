@@ -1107,6 +1107,7 @@ let clickMarker = null;
 let nearbyMarkers = [];
 let pinpointModeActive = false;
 let pinpointMarker = null;
+let pinpointPopup = null;
 let destinationMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1247,11 +1248,22 @@ function setPinpointLocation(coords) {
     if (userMarker) { userMarker.remove(); userMarker = null; }
     if (pinpointMarker) { pinpointMarker.remove(); pinpointMarker = null; }
 
+    const lat = coords[1];
+    const lng = coords[0];
+    const latStr = (lat >= 0 ? lat.toFixed(5) + '° N' : Math.abs(lat).toFixed(5) + '° S');
+    const lngStr = (lng >= 0 ? lng.toFixed(5) + '° E' : Math.abs(lng).toFixed(5) + '° W');
+
     const el = document.createElement('div');
     el.className = 'pinpoint-marker-el';
     el.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#e11d48;font-size:38px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));"></i>`;
     pinpointMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat(coords)
+        .addTo(map);
+
+    if (pinpointPopup) { pinpointPopup.remove(); pinpointPopup = null; }
+    pinpointPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: [0, -48], className: 'pinpoint-coords-popup' })
+        .setLngLat(coords)
+        .setHTML(`${latStr}&nbsp;&nbsp;&nbsp;${lngStr}`)
         .addTo(map);
 
     calculateRoute();
@@ -1260,6 +1272,7 @@ function setPinpointLocation(coords) {
 function clearRoute() {
     currentPos = null;
     if (pinpointMarker) { pinpointMarker.remove(); pinpointMarker = null; }
+    if (pinpointPopup) { pinpointPopup.remove(); pinpointPopup = null; }
     if (userMarker) { userMarker.remove(); userMarker = null; }
     if (destinationMarker) { destinationMarker.remove(); destinationMarker = null; }
     if (map.getSource('route')) {
