@@ -232,8 +232,8 @@ const OFFLINE_ROUTE_SPEED_KMH = {
 };
 const OFFLINE_ROUTING_GRAPH_PATH = './data/routing/agder-routing-graph.json.gz';
 const OFFLINE_ROUTING_GRID_SIZE_DEG = 0.02;
-const OFFLINE_ROUTING_MAX_SNAP_RINGS = 6;
-const OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M = 3000;
+const OFFLINE_ROUTING_MAX_SNAP_RINGS = 12;
+const OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M = 10000;
 const OFFLINE_ROUTING_HEURISTIC_SPEED_MPS = 36;
 const OFFLINE_REQUIRED_ASSETS = [
     '/index.html',
@@ -2077,15 +2077,35 @@ async function loadOfflineRoutingGraph() {
             const isGzipAsset = OFFLINE_ROUTING_GRAPH_PATH.endsWith('.gz');
 
             if (isGzipAsset) {
-                if (typeof DecompressionStream === 'undefined') {
-                    throw new Error('Browser does not support gzip decompression for offline graph');
+                // If the server already decoded Content-Encoding:gzip the response body
+                // is plain JSON. Detect that by checking for a JSON opening character.
+                const rawBuffer = await response.arrayBuffer();
+                const firstByte = new Uint8Array(rawBuffer)[0];
+                const isActuallyGzip = firstByte === 0x1f; // gzip magic byte
+
+                if (!isActuallyGzip) {
+                    // Server transparently decoded it — just parse as text
+                    return JSON.parse(new TextDecoder().decode(rawBuffer));
                 }
 
-                const compressedBuffer = await response.arrayBuffer();
-                const compressedBlob = new Blob([compressedBuffer]);
-                const decompressedStream = compressedBlob.stream().pipeThrough(new DecompressionStream('gzip'));
-                const decompressedText = await new Response(decompressedStream).text();
-                return JSON.parse(decompressedText);
+                if (typeof DecompressionStream !== 'undefined') {
+                    const blob = new Blob([rawBuffer]);
+                    const decompressedStream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
+                    const text = await new Response(decompressedStream).text();
+                    return JSON.parse(text);
+                }
+
+                // DecompressionStream unavailable — manual inflate via pako if loaded,
+                // otherwise throw a clear message so the status bar shows it.
+                if (typeof pako !== 'undefined') {
+                    const inflated = pako.inflate(new Uint8Array(rawBuffer), { to: 'string' });
+                    return JSON.parse(inflated);
+                }
+
+                throw new Error(
+                    'Offline graph: browser lacks DecompressionStream and pako is not loaded. ' +
+                    'Try a modern browser (Chrome 80+, Firefox 113+, Safari 16.4+).'
+                );
             }
 
             return response.json();
@@ -2405,7 +2425,11 @@ async function calculateRoute() {
         } catch (offlineError) {
             console.warn('Offline graph routing failed:', offlineError);
             setStraightLineRoute();
-            showStatusMessage('Offline: no local route was found, so a straight-line estimate is shown.', 'warn', 6000);
+            showStatusMessage(
+                `Offline routing failed (${offlineError.message}) — showing straight-line estimate.`,
+                'warn',
+                9000
+            );
             return;
         }
     }
@@ -2448,7 +2472,11 @@ async function calculateRoute() {
         } catch (offlineError) {
             console.warn('Offline graph fallback after online routing failure also failed:', offlineError);
             setStraightLineRoute();
-            showStatusMessage('Routing unavailable, showing straight-line estimate.', 'warn', 6000);
+            showStatusMessage(
+                `Routing unavailable (${offlineError.message}) — showing straight-line estimate.`,
+                'warn',
+                9000
+            );
         }
     }
 }
