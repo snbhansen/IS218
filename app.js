@@ -35,12 +35,13 @@ const TRANSLATIONS = {
         shelterTotalCapacity: 'Total capacity',
         shelterAvailableNow: 'Available now',
         shelterLastReported: 'Last reported',
-        shelterNoReport: 'No report yet',
+        shelterNoReport: 'No reports submitted yet',
         shelterReportLabel: 'Report available spots:',
         shelterSubmit: 'Submit report',
         shelterReportSent: 'Report sent ✓',
         shelterReportError: 'Error sending report',
         shelterLoading: 'Loading…',
+        shelterReportsCount: 'reports submitted',
     },
     no: {
         searchPlaceholder: 'Søk etter adresse...',
@@ -77,12 +78,13 @@ const TRANSLATIONS = {
         shelterTotalCapacity: 'Total kapasitet',
         shelterAvailableNow: 'Ledig nå',
         shelterLastReported: 'Sist rapportert',
-        shelterNoReport: 'Ingen rapport ennå',
+        shelterNoReport: 'Ingen rapporter innsendt ennå',
         shelterReportLabel: 'Rapporter ledige plasser:',
         shelterSubmit: 'Send rapport',
         shelterReportSent: 'Rapport sendt ✓',
         shelterReportError: 'Feil ved sending',
         shelterLoading: 'Laster…',
+        shelterReportsCount: 'rapporter innsendt',
     },
     de: {
         searchPlaceholder: 'Adresse suchen...',
@@ -119,12 +121,13 @@ const TRANSLATIONS = {
         shelterTotalCapacity: 'Gesamtkapazität',
         shelterAvailableNow: 'Verfügbar jetzt',
         shelterLastReported: 'Zuletzt gemeldet',
-        shelterNoReport: 'Noch kein Bericht',
+        shelterNoReport: 'Noch keine Berichte eingereicht',
         shelterReportLabel: 'Freie Plätze melden:',
         shelterSubmit: 'Bericht senden',
         shelterReportSent: 'Bericht gesendet ✓',
         shelterReportError: 'Fehler beim Senden',
         shelterLoading: 'Lädt…',
+        shelterReportsCount: 'Berichte eingereicht',
     },
     fr: {
         searchPlaceholder: 'Rechercher une adresse...',
@@ -161,12 +164,13 @@ const TRANSLATIONS = {
         shelterTotalCapacity: 'Capacité totale',
         shelterAvailableNow: 'Disponible maintenant',
         shelterLastReported: 'Dernière déclaration',
-        shelterNoReport: 'Aucun rapport',
+        shelterNoReport: 'Aucun rapport soumis pour l\'instant',
         shelterReportLabel: 'Signaler les places disponibles:',
         shelterSubmit: 'Envoyer rapport',
         shelterReportSent: 'Rapport envoyé ✓',
         shelterReportError: 'Erreur d\'envoi',
         shelterLoading: 'Chargement…',
+        shelterReportsCount: 'rapports soumis',
     },
     uk: {
         searchPlaceholder: 'Пошук адреси...',
@@ -203,12 +207,13 @@ const TRANSLATIONS = {
         shelterTotalCapacity: 'Загальна місткість',
         shelterAvailableNow: 'Доступно зараз',
         shelterLastReported: 'Остання доповідь',
-        shelterNoReport: 'Звітів ще немає',
+        shelterNoReport: 'Звітів ще не надіслано',
         shelterReportLabel: 'Повідомити про вільні місця:',
         shelterSubmit: 'Надіслати звіт',
         shelterReportSent: 'Звіт надіслано ✓',
         shelterReportError: 'Помилка надсилання',
         shelterLoading: 'Завантаження…',
+        shelterReportsCount: 'звітів надіслано',
     }
 };
 
@@ -1868,18 +1873,18 @@ function _escHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
-async function fetchLatestCapacityReport(romnr) {
+async function fetchCapacityReports(romnr) {
     try {
-        const { data, error } = await supabaseClient
+        const { data, error, count } = await supabaseClient
             .from('shelter_capacity_reports')
-            .select('ledig_plasser, rapportert_tid')
+            .select('ledig_plasser, rapportert_tid', { count: 'exact' })
             .eq('romnr', romnr)
             .order('rapportert_tid', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-        if (error) return null;
-        return data;
+            .limit(5);
+        if (error) { console.error('fetchCapacityReports feil:', error.message); return null; }
+        return { count: count ?? (data ? data.length : 0), reports: data || [] };
     } catch (e) {
+        console.error('fetchCapacityReports exception:', e);
         return null;
     }
 }
@@ -1900,22 +1905,36 @@ async function submitCapacityReport(romnr, ledigPlasser) {
     }
 }
 
-function renderCapacityStatus(statusEl, report, totalPlasser, t) {
+function renderCapacityStatus(statusEl, result, totalPlasser, t) {
     if (!statusEl) return;
-    if (!report) {
-        statusEl.textContent = t.shelterNoReport;
+    if (!result || result.count === 0 || result.reports.length === 0) {
+        statusEl.innerHTML = `<div style="font-size:12px;color:#9ca3af;">${t.shelterNoReport}</div>`;
         return;
     }
-    const ledig = report.ledig_plasser;
+    const locale = currentLang === 'no' ? 'nb-NO' : currentLang === 'uk' ? 'uk-UA' : currentLang === 'de' ? 'de-DE' : currentLang === 'fr' ? 'fr-FR' : 'en-US';
+    const latest = result.reports[0];
+    const ledig = latest.ledig_plasser;
     const pct = totalPlasser > 0 ? Math.round((ledig / totalPlasser) * 100) : 0;
     const color = pct > 50 ? '#10b981' : pct > 20 ? '#f59e0b' : '#ef4444';
-    const locale = currentLang === 'no' ? 'nb-NO' : currentLang === 'uk' ? 'uk-UA' : currentLang === 'de' ? 'de-DE' : currentLang === 'fr' ? 'fr-FR' : 'en-US';
-    const time = new Date(report.rapportert_tid).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+    const time = new Date(latest.rapportert_tid).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+
+    // Build list of recent reports (up to 5)
+    const recentRows = result.reports.map(r => {
+        const t2 = new Date(r.rapportert_tid).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+        const p2 = totalPlasser > 0 ? Math.round((r.ledig_plasser / totalPlasser) * 100) : 0;
+        const c2 = p2 > 50 ? '#10b981' : p2 > 20 ? '#f59e0b' : '#ef4444';
+        return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-bottom:1px solid #f3f4f6;">` +
+            `<span style="color:#374151;font-weight:600;">${r.ledig_plasser} <span style="color:#9ca3af;font-weight:400;">/ ${totalPlasser}</span></span>` +
+            `<span style="color:#9ca3af;">${t2}</span>` +
+            `</div>`;
+    }).join('');
+
     statusEl.innerHTML =
-        `<div style="font-size:13px;"><span style="color:#6b7280;">${t.shelterAvailableNow}:</span> ` +
+        `<div style="font-size:13px;margin-bottom:2px;"><span style="color:#6b7280;">${t.shelterAvailableNow}:</span> ` +
         `<b style="color:${color};">${ledig}</b> / ${totalPlasser}</div>` +
         `<div class="capacity-bar"><div class="capacity-bar-fill" style="width:${pct}%;background:${color};"></div></div>` +
-        `<div style="font-size:11px;color:#9ca3af;">${t.shelterLastReported}: ${time}</div>`;
+        `<div style="font-size:11px;color:#6b7280;font-weight:700;margin:6px 0 2px;">${result.count} ${t.shelterReportsCount}:</div>` +
+        `<div style="max-height:80px;overflow-y:auto;">${recentRows}</div>`;
 }
 
 // INTERACTION
@@ -1967,8 +1986,8 @@ map.on('click', 'tilfluktsrom-layer', async (e) => {
                 btn.textContent = tNow.shelterSubmit;
                 btn.disabled = false;
                 // Refresh the status display
-                const report = await fetchLatestCapacityReport(romnr);
-                renderCapacityStatus(document.getElementById(`${uid}-status`), report, totalPlasser, tNow);
+                const result = await fetchCapacityReports(romnr);
+                renderCapacityStatus(document.getElementById(`${uid}-status`), result, totalPlasser, tNow);
             } else {
                 msgEl.textContent = tNow.shelterReportError;
                 msgEl.style.color = '#ef4444';
@@ -1979,9 +1998,9 @@ map.on('click', 'tilfluktsrom-layer', async (e) => {
         });
     }
 
-    // Load and render existing report
-    const report = await fetchLatestCapacityReport(romnr);
-    renderCapacityStatus(document.getElementById(`${uid}-status`), report, totalPlasser, t);
+    // Load and render existing reports
+    const result = await fetchCapacityReports(romnr);
+    renderCapacityStatus(document.getElementById(`${uid}-status`), result, totalPlasser, t);
 });
 
 map.on('click', 'brannstasjoner-layer', (e) => {
