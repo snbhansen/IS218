@@ -1,5 +1,5 @@
 # IS218
-Student repository – Group 15
+Student repository – Group 15 ATLAS
 
 ## Kort Beskrivelse 
 Dette prosjektet er et responsivt webkart (SPA) som hjelper innbyggere i Norge med å finne nærmeste beredskapsressurs når tid er kritisk. Brukeren kan bruke GPS via posisjonsknappen eller søke etter adresse, og appen finner nærmeste drikkevann, tilfluktsrom, brannstasjon eller sykehus. Deretter beregnes rute (bil eller gange), og appen viser estimert tid og avstand.

@@ -358,7 +358,10 @@ def build_graph_from_pbf(pbf_path: Path, bounds: Bounds | None) -> dict[str, Any
 
 def main() -> None:
     parser = argparse.ArgumentParser(description='Build an offline routing graph from a local OSM PBF.')
-    parser.add_argument('--pbf', default='data/osm/sorlandet-260427.osm.pbf', help='Input OSM PBF file.')
+    parser.add_argument('--pbf', default='data/osm/sorlandet-260427.osm.pbf',
+                        help='Path to the input OSM PBF file (relative to repo root or absolute). '
+                             'Download a regional extract from https://download.geofabrik.de/ '
+                             'and pass the path here. Note: *.osm.pbf files are excluded from git.')
     parser.add_argument('--region', default='data/datasett/agder_grense.geojson', help='GeoJSON file defining the routing area (bbox clip).')
     parser.add_argument('--output', default='data/routing/agder-routing-graph.json.gz', help='Output graph JSON file (.json or .json.gz).')
     parser.add_argument('--buffer-degrees', type=float, default=0.03, help='Bounding-box buffer around the region in degrees.')
@@ -371,7 +374,13 @@ def main() -> None:
     output_path = (root / args.output).resolve()
 
     if not pbf_path.exists():
-        raise FileNotFoundError(pbf_path)
+        print(
+            f'ERROR: PBF file not found: {pbf_path}\n'
+            'Download a regional OSM extract (e.g. for Sørlandet/Agder) from:\n'
+            '  https://download.geofabrik.de/europe/norway.html\n'
+            f'Then re-run with: --pbf <path-to-your.osm.pbf>'
+        )
+        raise SystemExit(1)
 
     clip_bounds: Bounds | None = None
     if not args.no_region_clip:

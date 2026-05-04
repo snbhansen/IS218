@@ -398,7 +398,7 @@ async function probeInternetConnectivity() {
     return false;
 }
 
-async function checkOfflineReadinessStatus(includePmtiles = true) {
+async function checkOfflineReadinessStatus(includePmtiles = false) {
     if (!('serviceWorker' in navigator) || !('caches' in window)) {
         return {
             offlineReady: false,
@@ -448,7 +448,7 @@ async function refreshConnectivityAndReadiness(opts = {}) {
         connectivityState.browserOnline = navigator.onLine;
         connectivityState.internetReachable = await probeInternetConnectivity();
 
-        const readiness = await checkOfflineReadinessStatus(true);
+        const readiness = await checkOfflineReadinessStatus(false);
         connectivityState.offlineReady = readiness.offlineReady;
         connectivityState.offlineReadyLimited = readiness.offlineReadyLimited;
         connectivityState.missingAssets = readiness.missingAssets;
@@ -458,8 +458,6 @@ async function refreshConnectivityAndReadiness(opts = {}) {
         if (announce && !connectivityState.internetReachable) {
             if (connectivityState.offlineReady) {
                 showStatusMessage('Internet unavailable. Offline-ready mode is active.', 'warn', 6000);
-            } else if (connectivityState.offlineReadyLimited) {
-                showStatusMessage('Internet unavailable. Offline-ready (limited services): PMTiles basemap cache is missing.', 'warn', 7000);
             } else {
                 showStatusMessage('Internet unavailable and cache readiness is incomplete.', 'warn', 7000);
             }
@@ -510,16 +508,14 @@ function registerServiceWorker() {
 
 async function runOfflineReadinessCheck() {
     try {
-        const readiness = await checkOfflineReadinessStatus(true);
+        const readiness = await checkOfflineReadinessStatus(false);
         connectivityState.offlineReady = readiness.offlineReady;
         connectivityState.offlineReadyLimited = readiness.offlineReadyLimited;
         connectivityState.missingAssets = readiness.missingAssets;
         renderConnectivityIndicator();
 
         if (readiness.offlineReady) {
-            showStatusMessage('Offline readiness OK: app shell, emergency datasets, and PMTiles basemap are cached.', 'info');
-        } else if (readiness.offlineReadyLimited) {
-            showStatusMessage('Offline-ready (limited services): app shell and emergency data are cached, but PMTiles basemap is missing.', 'warn', 7000);
+            showStatusMessage('Offline readiness OK: app shell and emergency datasets are cached.', 'info');
         } else {
             const shortList = readiness.missingAssets.slice(0, 4).join(', ');
             const suffix = readiness.missingAssets.length > 4 ? '...' : '';
@@ -2577,7 +2573,16 @@ async function calculateRoute() {
     const setRouteResult = (distanceKm, durationMin, destinationLabel, isFallback, fallbackLabel = 'offline estimate') => {
         document.getElementById('result-area').style.display = 'block';
         document.getElementById('res-info').innerText = `${Math.round(durationMin)} min  ·  ${distanceKm.toFixed(1)} km`;
-        document.getElementById('res-dest').innerHTML = `To: <b>${destinationLabel}</b>${isFallback ? ` (${fallbackLabel})` : ''}`;
+        const resDest = document.getElementById('res-dest');
+        const resultToLabel = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].resultTo) || (TRANSLATIONS.en && TRANSLATIONS.en.resultTo) || 'To:';
+        resDest.textContent = '';
+        resDest.appendChild(document.createTextNode(`${resultToLabel} `));
+        const destNameEl = document.createElement('b');
+        destNameEl.textContent = destinationLabel;
+        resDest.appendChild(destNameEl);
+        if (isFallback) {
+            resDest.appendChild(document.createTextNode(` (${fallbackLabel})`));
+        }
     };
 
     const showDestinationMarker = () => {
