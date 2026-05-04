@@ -1,4 +1,4 @@
-// --- TRANSLATIONS ---
+﻿// --- TRANSLATIONS ---
 const TRANSLATIONS = {
     en: {
         searchPlaceholder: 'Search address...',
@@ -220,6 +220,313 @@ let dataCache = {
     drikkevann: null,
     sykehus: null
 };
+const LOCAL_DATA_PATHS = {
+    tilfluktsrom: './data/datasett/tilfluktsrom.geojson',
+    brannstasjoner: './data/datasett/brannstasjoner.geojson',
+    drikkevann: './data/datasett/drikkevann.geojson',
+    sykehus: './data/datasett/sykehus.geojson'
+};
+const OFFLINE_ROUTE_SPEED_KMH = {
+    walking: 5,
+    driving: 50
+};
+const OFFLINE_ROUTING_GRAPH_PATH = './data/routing/agder-routing-graph.json.gz';
+const OFFLINE_ROUTING_GRID_SIZE_DEG = 0.02;
+const OFFLINE_ROUTING_MAX_SNAP_RINGS = 12;
+const OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M = 10000;
+const OFFLINE_ROUTING_HEURISTIC_SPEED_MPS = 36;
+const OFFLINE_REQUIRED_ASSETS = [
+    '/index.html',
+    '/app.js',
+    '/manifest.webmanifest',
+    '/icons/pwa-icon.svg',
+    '/data/routing/agder-routing-graph.json.gz',
+    '/data/datasett/tilfluktsrom.geojson',
+    '/data/datasett/brannstasjoner.geojson',
+    '/data/datasett/drikkevann.geojson',
+    '/data/datasett/sykehus.geojson'
+];
+const OFFLINE_REQUIRED_PMTILES_ASSET = '/data/tiles/norway.pmtiles';
+const NORWAY_PMTILES_PATH = './data/tiles/norway.pmtiles';
+let usesCachedData = false;
+let basemapFallbackApplied = false;
+const CONNECTIVITY_PROBE_URLS = [
+    'https://www.gstatic.com/generate_204',
+    'https://cloudflare.com/cdn-cgi/trace'
+];
+const CONNECTIVITY_PROBE_TIMEOUT_MS = 3500;
+const CONNECTIVITY_POLL_INTERVAL_MS = 30000;
+const connectivityState = {
+    browserOnline: navigator.onLine,
+    internetReachable: null,
+    offlineReady: false,
+    offlineReadyLimited: false,
+    missingAssets: [],
+    updating: false
+};
+
+function showStatusMessage(message, type = 'info', ttlMs = 0) {
+    const el = document.getElementById('status-message');
+    if (!el) return;
+
+    el.textContent = message;
+    el.style.display = 'block';
+    el.style.borderColor = type === 'error' ? '#ef4444' : type === 'warn' ? '#f59e0b' : '#d1d5db';
+
+    if (ttlMs > 0) {
+        window.setTimeout(() => {
+            if (el.textContent === message) el.style.display = 'none';
+        }, ttlMs);
+    }
+}
+
+// Browser online state (navigator.onLine) and real internet reachability are different.
+// We keep them separate and render an honest status badge based on both + cached readiness.
+function renderConnectivityIndicator() {
+    const indicator = document.getElementById('offline-indicator');
+    if (!indicator) return;
+
+    const hasInternet = connectivityState.internetReachable === true;
+    const hasOffline = connectivityState.offlineReady;
+    const hasLimitedOffline = connectivityState.offlineReadyLimited;
+
+    indicator.className = `status-pill ${hasInternet ? 'online' : 'offline'}`;
+
+    if (hasInternet && hasOffline) {
+        indicator.textContent = 'Internet available · Offline-ready';
+    } else if (hasInternet) {
+        indicator.textContent = 'Internet available';
+    } else if (hasOffline) {
+        indicator.textContent = 'Internet unavailable · Offline-ready';
+    } else if (hasLimitedOffline) {
+        indicator.textContent = 'Internet unavailable · Offline-ready (limited services)';
+    } else {
+        indicator.textContent = 'Internet unavailable';
+    }
+
+    if (!hasInternet && mapLoaded && (terrainActive || city3DActive)) {
+        showStatusMessage('Offline: 3D Terrain og 3D City er deaktivert.', 'warn', 6000);
+        restore2DMapView();
+        return;
+    }
+
+    if (typeof updateViewModeToggle === 'function') {
+        updateViewModeToggle(false);
+    }
+}
+
+function hasInternetConnectivity() {
+    if (typeof connectivityState.internetReachable === 'boolean') {
+        return connectivityState.internetReachable;
+    }
+
+    // Fallback only while first connectivity probe is still pending.
+    return navigator.onLine;
+}
+
+async function probeInternetConnectivity() {
+    if (!navigator.onLine) return false;
+
+    const probe = async (url) => {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), CONNECTIVITY_PROBE_TIMEOUT_MS);
+        try {
+            // no-cors keeps this lightweight and avoids CORS preflight; resolved fetch means network path is reachable.
+            await fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+            return true;
+        } catch {
+            return false;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    };
+
+    for (const url of CONNECTIVITY_PROBE_URLS) {
+        if (await probe(url)) return true;
+    }
+
+    return false;
+}
+
+async function checkOfflineReadinessStatus(includePmtiles = false) {
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+        return {
+            offlineReady: false,
+            offlineReadyLimited: false,
+            missingAssets: ['Service Worker / Cache Storage unavailable']
+        };
+    }
+
+    const registration = await navigator.serviceWorker.getRegistration('./');
+    if (!registration) {
+        return {
+            offlineReady: false,
+            offlineReadyLimited: false,
+            missingAssets: ['Service worker not registered']
+        };
+    }
+
+    const missingCoreAssets = [];
+    for (const assetPath of OFFLINE_REQUIRED_ASSETS) {
+        const url = new URL(assetPath, window.location.origin).href;
+        const match = await caches.match(url);
+        if (!match) missingCoreAssets.push(assetPath);
+    }
+
+    let pmtilesCached = true;
+    if (includePmtiles) {
+        const pmtilesUrl = new URL(OFFLINE_REQUIRED_PMTILES_ASSET, window.location.origin).href;
+        pmtilesCached = !!(await caches.match(pmtilesUrl));
+    }
+
+    const coreReady = missingCoreAssets.length === 0;
+    const offlineReady = coreReady && (!includePmtiles || pmtilesCached);
+    const offlineReadyLimited = coreReady && includePmtiles && !pmtilesCached;
+    const missingAssets = [...missingCoreAssets];
+    if (includePmtiles && !pmtilesCached) missingAssets.push(OFFLINE_REQUIRED_PMTILES_ASSET);
+
+    return { offlineReady, offlineReadyLimited, missingAssets };
+}
+
+async function refreshConnectivityAndReadiness(opts = {}) {
+    const { announce = false } = opts;
+    if (connectivityState.updating) return;
+
+    connectivityState.updating = true;
+
+    try {
+        connectivityState.browserOnline = navigator.onLine;
+        connectivityState.internetReachable = await probeInternetConnectivity();
+
+        const readiness = await checkOfflineReadinessStatus(false);
+        connectivityState.offlineReady = readiness.offlineReady;
+        connectivityState.offlineReadyLimited = readiness.offlineReadyLimited;
+        connectivityState.missingAssets = readiness.missingAssets;
+
+        renderConnectivityIndicator();
+
+        if (announce && !connectivityState.internetReachable) {
+            if (connectivityState.offlineReady) {
+                showStatusMessage('Internet unavailable. Offline-ready mode is active.', 'warn', 6000);
+            } else {
+                showStatusMessage('Internet unavailable and cache readiness is incomplete.', 'warn', 7000);
+            }
+        }
+    } catch (error) {
+        console.error('Connectivity/readiness refresh failed:', error);
+        renderConnectivityIndicator();
+    } finally {
+        connectivityState.updating = false;
+    }
+}
+
+function startConnectivityMonitoring() {
+    refreshConnectivityAndReadiness({ announce: false });
+
+    window.addEventListener('online', () => {
+        refreshConnectivityAndReadiness({ announce: true });
+        showStatusMessage('Browser network state changed: online. Verifying internet reachability...', 'info', 4000);
+    });
+
+    window.addEventListener('offline', () => {
+        refreshConnectivityAndReadiness({ announce: true });
+    });
+
+    window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            refreshConnectivityAndReadiness({ announce: false });
+        }
+    }, CONNECTIVITY_POLL_INTERVAL_MS);
+}
+
+function updateOfflineIndicator() {
+    // Kept for compatibility with existing calls.
+    renderConnectivityIndicator();
+
+}
+
+function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', async () => {
+        try {
+            await navigator.serviceWorker.register('./service-worker.js');
+        } catch (error) {
+            console.warn('Service worker registration failed:', error);
+        }
+    });
+}
+
+async function runOfflineReadinessCheck() {
+    try {
+        const readiness = await checkOfflineReadinessStatus(false);
+        connectivityState.offlineReady = readiness.offlineReady;
+        connectivityState.offlineReadyLimited = readiness.offlineReadyLimited;
+        connectivityState.missingAssets = readiness.missingAssets;
+        renderConnectivityIndicator();
+
+        if (readiness.offlineReady) {
+            showStatusMessage('Offline readiness OK: app shell and emergency datasets are cached.', 'info');
+        } else {
+            const shortList = readiness.missingAssets.slice(0, 4).join(', ');
+            const suffix = readiness.missingAssets.length > 4 ? '...' : '';
+            showStatusMessage(`Offline not ready. Missing ${readiness.missingAssets.length} assets: ${shortList}${suffix}`, 'warn');
+        }
+
+        await refreshConnectivityAndReadiness({ announce: false });
+    } catch (error) {
+        console.error('Offline readiness check failed:', error);
+        showStatusMessage('Offline readiness check failed. See console for details.', 'error', 6000);
+    }
+}
+
+function normalizeGeoJSONToPoints(featureCollection, tableName) {
+    if (!featureCollection || !Array.isArray(featureCollection.features)) {
+        return { type: 'FeatureCollection', features: [] };
+    }
+
+    const features = featureCollection.features.map((feature, idx) => {
+        if (!feature || !feature.geometry) return null;
+
+        let geometry = feature.geometry;
+        if (geometry.type !== 'Point') {
+            try {
+                geometry = turf.pointOnFeature(feature).geometry;
+            } catch {
+                return null;
+            }
+        }
+
+        const properties = feature.properties || {};
+        const defaultName = tableName === 'sykehus' ? 'Hospital' : tableName === 'brannstasjoner' ? 'Fire Station' : tableName === 'drikkevann' ? 'Drinking Water' : 'Shelter';
+        const navn = properties.navn || properties.name || properties.adresse || properties.brannstasjon || `${defaultName} ${idx + 1}`;
+
+        return {
+            type: 'Feature',
+            geometry,
+            properties: {
+                ...properties,
+                navn,
+                name: properties.name || properties.navn || null
+            }
+        };
+    }).filter(Boolean);
+
+    return { type: 'FeatureCollection', features };
+}
+
+async function fetchLocalGeoJSON(tableName) {
+    const localPath = LOCAL_DATA_PATHS[tableName];
+    if (!localPath) return null;
+
+    const response = await fetch(localPath);
+    if (!response.ok) throw new Error(`Could not load local dataset for ${tableName}`);
+    const data = await response.json();
+    return normalizeGeoJSONToPoints(data, tableName);
+}
+const VIEW_MODE = {
+    MAP_2D: '2d',
+    CITY_3D: '3d'
+};
 const NORWAY_3D_SOURCE_ID = 'norway-3d-buildings-source';
 const NORWAY_3D_LAYER_ID = 'norway-3d-buildings-layer';
 const NORWAY_3D_FOOTPRINT_LAYER_ID = 'norway-3d-footprints-layer';
@@ -249,9 +556,23 @@ let pending3DBuildingAreaKey = null;
 let norway3DBuildingsPromise = null;
 let suppress3DBuildingRefresh = false;
 let threeDViewTrackingBound = false;
+let offlineRoutingGraphState = null;
+let offlineRoutingGraphPromise = null;
 // --- NY HJELPEFUNKSJON SOM HÅNDTERER HEX-KODE ---
 async function fetchGeoJSON(tableName) {
     console.log(`Henter data fra tabell: ${tableName}...`);
+
+    if (!hasInternetConnectivity()) {
+        try {
+            const localData = await fetchLocalGeoJSON(tableName);
+            usesCachedData = true;
+            showStatusMessage(`Offline: using local ${tableName} dataset.`, 'warn', 5000);
+            return localData;
+        } catch (localError) {
+            console.error(`Kunne ikke laste lokaldata for ${tableName}:`, localError);
+            return null;
+        }
+    }
 
     // Vi henter alt data som det er
     const { data, error } = await supabaseClient
@@ -260,7 +581,15 @@ async function fetchGeoJSON(tableName) {
 
     if (error) {
         console.error(`Feil fra Supabase (${tableName}):`, error);
-        return null;
+        try {
+            const localData = await fetchLocalGeoJSON(tableName);
+            usesCachedData = true;
+            showStatusMessage(`Network issue: falling back to local ${tableName} data.`, 'warn', 6000);
+            return localData;
+        } catch (localError) {
+            console.error(`Kunne ikke laste lokal fallback for ${tableName}:`, localError);
+            return null;
+        }
     }
 
     const features = data.map(row => {
@@ -324,79 +653,175 @@ async function fetchGeoJSON(tableName) {
     }).filter(f => f !== null);
 
     console.log(`Ferdig behandlet ${features.length} punkter for ${tableName}.`);
-    return { type: 'FeatureCollection', features: features };
+    return normalizeGeoJSONToPoints({ type: 'FeatureCollection', features }, tableName);
 }
 
 // MAP SETUP
-const mapStyle = {
-    'version': 8,
-    'sources': {
-        'osm': {
-            'type': 'raster',
-            'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            'tileSize': 256,
-            'maxzoom': 19,
-            'attribution': '&copy; OpenStreetMap Contributors'
+function buildRasterFallbackStyle() {
+    return {
+        'version': 8,
+        'sources': {
+            'osm': {
+                'type': 'raster',
+                'tiles': ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                'tileSize': 256,
+                'maxzoom': 19,
+                'attribution': '&copy; OpenStreetMap Contributors'
+            },
+            'kartverket-topo': {
+                'type': 'raster',
+                'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
+                'tileSize': 256,
+                'maxzoom': 20,
+                'attribution': '&copy; Kartverket'
+            },
+            'kartverket-farger': {
+                'type': 'raster',
+                'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
+                'tileSize': 256,
+                'maxzoom': 20,
+                'attribution': '&copy; Kartverket'
+            },
+            'kartverket-graatone': {
+                'type': 'raster',
+                'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
+                'tileSize': 256,
+                'maxzoom': 20,
+                'attribution': '&copy; Kartverket'
+            }
         },
-        'kartverket-topo': {
-            'type': 'raster',
-            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png'],
-            'tileSize': 256,
-            'maxzoom': 20,
-            'attribution': '&copy; Kartverket'
+        'layers': [
+            {
+                'id': 'fallback-background',
+                'type': 'background',
+                'paint': { 'background-color': '#e5e7eb' }
+            },
+            {
+                'id': 'osm-layer',
+                'type': 'raster',
+                'source': 'osm'
+            },
+            {
+                'id': 'kartverket-topo-layer',
+                'type': 'raster',
+                'source': 'kartverket-topo',
+                'layout': { 'visibility': 'none' }
+            },
+            {
+                'id': 'kartverket-farger-layer',
+                'type': 'raster',
+                'source': 'kartverket-farger',
+                'layout': { 'visibility': 'none' }
+            },
+            {
+                'id': 'kartverket-graatone-layer',
+                'type': 'raster',
+                'source': 'kartverket-graatone',
+                'layout': { 'visibility': 'none' }
+            }
+        ]
+    };
+}
+
+function buildNorwayPmtilesStyle() {
+    return {
+        version: 8,
+        sources: {
+            norway: {
+                type: 'vector',
+                url: `pmtiles://${NORWAY_PMTILES_PATH}`,
+                attribution: '&copy; OpenMapTiles &copy; OpenStreetMap contributors'
+            }
         },
-        'kartverket-farger': {
-            'type': 'raster',
-            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png'],
-            'tileSize': 256,
-            'maxzoom': 20,
-            'attribution': '&copy; Kartverket'
-        },
-        'kartverket-graatone': {
-            'type': 'raster',
-            'tiles': ['https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png'],
-            'tileSize': 256,
-            'maxzoom': 20,
-            'attribution': '&copy; Kartverket'
+        layers: [
+            {
+                id: 'background',
+                type: 'background',
+                paint: { 'background-color': '#eef2f7' }
+            },
+            {
+                id: 'water',
+                type: 'fill',
+                source: 'norway',
+                'source-layer': 'water',
+                paint: { 'fill-color': '#a7d3f5' }
+            },
+            {
+                id: 'landcover',
+                type: 'fill',
+                source: 'norway',
+                'source-layer': 'landcover',
+                paint: { 'fill-color': '#dcead4', 'fill-opacity': 0.65 }
+            },
+            {
+                id: 'roads',
+                type: 'line',
+                source: 'norway',
+                'source-layer': 'transportation',
+                paint: {
+                    'line-color': '#4b5563',
+                    'line-width': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        6, 0.4,
+                        10, 1.2,
+                        14, 2.6
+                    ],
+                    'line-opacity': 0.9
+                }
+            },
+            {
+                id: 'buildings',
+                type: 'fill',
+                source: 'norway',
+                'source-layer': 'building',
+                minzoom: 13,
+                paint: { 'fill-color': '#d1d5db', 'fill-opacity': 0.7 }
+            }
+        ]
+    };
+}
+
+function buildInitialMapStyle() {
+    if (window.pmtiles && maplibregl && typeof maplibregl.addProtocol === 'function') {
+        try {
+            const protocol = new window.pmtiles.Protocol();
+            maplibregl.addProtocol('pmtiles', protocol.tile);
+            return buildNorwayPmtilesStyle();
+        } catch (error) {
+            console.warn('PMTiles protocol setup failed, using raster fallback:', error);
+            showStatusMessage('Could not initialize offline basemap. Falling back to online raster tiles.', 'warn', 7000);
         }
-    },
-    'layers': [
-        {
-            'id': 'osm-layer',
-            'type': 'raster',
-            'source': 'osm'
-        },
-        {
-            'id': 'kartverket-topo-layer',
-            'type': 'raster',
-            'source': 'kartverket-topo',
-            'layout': { 'visibility': 'none' }
-        },
-        {
-            'id': 'kartverket-farger-layer',
-            'type': 'raster',
-            'source': 'kartverket-farger',
-            'layout': { 'visibility': 'none' }
-        },
-        {
-            'id': 'kartverket-graatone-layer',
-            'type': 'raster',
-            'source': 'kartverket-graatone',
-            'layout': { 'visibility': 'none' }
-        }
-    ]
-};
+    }
+
+    return buildRasterFallbackStyle();
+}
 
 try {
     map = new maplibregl.Map({
         container: 'map',
-        style: mapStyle,
+        style: buildInitialMapStyle(),
         center: [8.0182, 58.1467], // Kristiansand
         zoom: 12,
         canvasContextAttributes: { antialias: true }
     });
     // Standard navigation control (zoom in/out) er fjernet herfra for å gi plass til vår custom 2x2 grid.
 } catch (err) { console.error("Map error:", err); }
+
+map.on('error', (event) => {
+    const sourceId = event && event.sourceId ? event.sourceId : '';
+    if (sourceId === 'osm') {
+        showStatusMessage('Basemap tiles are unavailable. Emergency layers remain available.', 'warn', 7000);
+    } else if (sourceId === 'norway') {
+        showStatusMessage('Offline Norway basemap could not be read. Check data/tiles/norway.pmtiles.', 'warn', 7000);
+        if (!basemapFallbackApplied && hasInternetConnectivity()) {
+            basemapFallbackApplied = true;
+            map.setStyle(buildRasterFallbackStyle());
+            showStatusMessage('Switched to online raster basemap fallback.', 'warn', 7000);
+        }
+    }
+});
 
 // DATA LOADING
 map.on('load', async () => {
@@ -475,36 +900,8 @@ map.on('load', async () => {
         });
     }
 
-    // 4. Hent Sykehuser
-    // Her må vi håndtere det spesielle WKT-formatet som Supabase returnerer for geometri.
-    async function fetchHospitals() {
-        console.log("Henter data fra sykehus...");
-        const { data, error } = await supabaseClient
-            .from('sykehus')
-            .select('name, phone, WKT');
-
-        if (error) {
-            console.error("Feil fra Supabase (sykehus):", error);
-            return null;
-        }
-
-        const features = data.map(row => {
-            if (!row.WKT || row.WKT.type !== 'Point') return null;
-
-            return {
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: row.WKT.coordinates },
-                properties: {
-                    name: row.name,
-                    phone: row.phone || null
-                }
-            };
-        }).filter(f => f !== null);
-
-        console.log(`Ferdig behandlet ${features.length} sykehus-punkter.`);
-        return { type: 'FeatureCollection', features };
-    }
-    const hospitals = await fetchHospitals();
+    // 4. Hent Sykehus
+    const hospitals = await fetchGeoJSON('sykehus');
 
     if (hospitals) {
         dataCache.sykehus = hospitals;
@@ -521,6 +918,7 @@ map.on('load', async () => {
     map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
         id: 'route-layer-casing',
+
         type: 'line',
         source: 'route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
@@ -533,6 +931,16 @@ map.on('load', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#1d4ed8', 'line-width': 5, 'line-opacity': 0.95 }
     });
+
+    // Pre-warm the offline routing graph in the background so it is ready when the
+    // user first requests a route (avoids a noticeable delay on first route request).
+    window.setTimeout(() => {
+        loadOfflineRoutingGraph().then(() => {
+            console.info('Offline routing graph pre-loaded successfully.');
+        }).catch((err) => {
+            console.warn('Offline routing graph pre-load failed (will retry on first route request):', err.message);
+        });
+    }, 3000); // slight delay so map data loads first
 
     // Base map switcher
     const BASE_LAYERS = {
@@ -582,7 +990,7 @@ map.on('load', async () => {
         activeBaseMap = key;
         const isSatellite = key === 'satellite';
         Object.entries(BASE_LAYERS).forEach(([k, layerId]) => {
-            map.setLayoutProperty(layerId, 'visibility', (!isSatellite && k === key) ? 'visible' : 'none');
+            try { map.setLayoutProperty(layerId, 'visibility', (!isSatellite && k === key) ? 'visible' : 'none'); } catch (_) {}
         });
         if (isSatellite) {
             map.setMaxZoom(SATELLITE_MAX_ZOOM);
@@ -610,6 +1018,10 @@ map.on('load', async () => {
         tileSize: 256,
         encoding: 'terrarium'
     });
+
+    if (usesCachedData) {
+        showStatusMessage('Running with cached/local emergency data. Some online services are limited.', 'warn');
+    }
 
     setupControls();
     setTimeout(function () { if (typeof startInfoBarSync === 'function') startInfoBarSync(); }, 400);
@@ -648,18 +1060,24 @@ function updateViewModeToggle(isLoading) {
     if (!btn2D || !btn3D || !btnTerrain) return;
 
     const in2D = !terrainActive && !city3DActive;
+    const online = hasInternetConnectivity();
 
     btn2D.classList.toggle('active', in2D);
     btnTerrain.classList.toggle('active', terrainActive);
     btn3D.classList.toggle('active', city3DActive);
+
+    btnTerrain.style.display = online ? '' : 'none';
+    btn3D.style.display = online ? '' : 'none';
 
     btn2D.setAttribute('aria-pressed', in2D ? 'true' : 'false');
     btnTerrain.setAttribute('aria-pressed', terrainActive ? 'true' : 'false');
     btn3D.setAttribute('aria-pressed', city3DActive ? 'true' : 'false');
 
     btn2D.disabled = !!isLoading;
-    btnTerrain.disabled = !!isLoading;
-    btn3D.disabled = !!isLoading;
+    btnTerrain.disabled = !!isLoading || !online;
+    btn3D.disabled = !!isLoading || !online;
+    btnTerrain.title = online ? '' : 'Requires internet';
+    btn3D.title = online ? '' : 'Requires internet';
     btn3D.textContent = isLoading
         ? TRANSLATIONS[currentLang].view3dLoading
         : TRANSLATIONS[currentLang].view3d;
@@ -976,12 +1394,22 @@ async function syncNorway3DBuildingsToCurrentView() {
 async function toggle3DCityView() {
     if (!mapLoaded) return;
 
+    if (!hasInternetConnectivity()) {
+        showStatusMessage('3D City requires internet.', 'warn', 5000);
+        return;
+    }
+
     if (city3DActive) {
         city3DActive = false;
         suppress3DBuildingRefresh = false;
         setNorway3DLayerVisibility(false);
         if (!terrainActive) map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
         updateViewModeToggle(false);
+        return;
+    }
+
+    if (!hasInternetConnectivity()) {
+        showStatusMessage('3D city buildings require internet (Overpass API).', 'warn', 6000);
         return;
     }
 
@@ -1056,6 +1484,11 @@ function restore2DMapView() {
 function toggleTerrainView() {
     if (!mapLoaded) return;
 
+    if (!hasInternetConnectivity()) {
+        showStatusMessage('3D Terrain requires internet.', 'warn', 5000);
+        return;
+    }
+
     if (terrainActive) {
         terrainActive = false;
         map.setTerrain(null);
@@ -1111,9 +1544,19 @@ let pinpointPopup = null;
 let destinationMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    registerServiceWorker();
+    startConnectivityMonitoring();
+
     const slider = document.getElementById('radius-slider');
     const label = document.getElementById('radius-label');
     if (slider) slider.addEventListener('input', () => { label.textContent = slider.value + ' m'; });
+
+    const offlineCheckBtn = document.getElementById('btn-offline-check');
+    if (offlineCheckBtn) {
+        offlineCheckBtn.addEventListener('click', () => {
+            runOfflineReadinessCheck();
+        });
+    }
 
     const btn = document.getElementById('btn-click-mode');
     if (btn) btn.addEventListener('click', () => {
@@ -1138,18 +1581,61 @@ map.on('click', async (e) => {
     const lat = e.lngLat.lat;
     const radius = parseInt(document.getElementById('radius-slider').value, 10);
     showClickCircle(lng, lat, radius);
+
+    if (!hasInternetConnectivity()) {
+        const localResults = findNearbyLocalResources(lng, lat, radius);
+        showStatusMessage('Offline: radius results are computed from cached emergency data.', 'warn', 5000);
+        renderNearbyResults(localResults);
+        return;
+    }
+
     const { data, error } = await supabaseClient.rpc('finn_naerliggende', {
         klikk_lng: lng, klikk_lat: lat, radius_m: radius
     });
     if (error) {
         console.error('Supabase RPC-feil:', error);
-        const panel = document.getElementById('nearby-results');
-        panel.style.display = 'block';
-        panel.innerHTML = '<span style="color:red;">Feil ved romlig spørring. Sjekk konsollen.</span>';
+        const localResults = findNearbyLocalResources(lng, lat, radius);
+        showStatusMessage('Live spatial query failed. Showing local cached results instead.', 'warn', 6000);
+        renderNearbyResults(localResults);
         return;
     }
     renderNearbyResults(data);
 });
+
+function findNearbyLocalResources(lng, lat, radiusMeters) {
+    const origin = turf.point([lng, lat]);
+    const groups = [
+        { key: 'tilfluktsrom', type: 'tilfluktsrom' },
+        { key: 'brannstasjoner', type: 'brannstasjon' },
+        { key: 'sykehus', type: 'sykehus' },
+        { key: 'drikkevann', type: 'drikkevann' }
+    ];
+
+    const results = [];
+    groups.forEach(({ key, type }) => {
+        const fc = dataCache[key];
+        if (!fc || !Array.isArray(fc.features)) return;
+
+        fc.features.forEach((feature) => {
+            if (!feature || !feature.geometry || feature.geometry.type !== 'Point') return;
+            const coords = feature.geometry.coordinates;
+            const distanceKm = turf.distance(origin, turf.point(coords), { units: 'kilometers' });
+            const distanceMeters = distanceKm * 1000;
+            if (distanceMeters > radiusMeters) return;
+
+            const p = feature.properties || {};
+            results.push({
+                ressurs_type: type,
+                navn: p.navn || p.name || p.adresse || p.brannstasjon || 'Unknown',
+                distanse_m: distanceMeters,
+                lon: coords[0],
+                lat_out: coords[1]
+            });
+        });
+    });
+
+    return results.sort((a, b) => a.distanse_m - b.distanse_m);
+}
 
 function showClickCircle(lng, lat, radius) {
     const circle = turf.circle([lng, lat], radius / 1000, { steps: 64, units: 'kilometers' });
@@ -1401,12 +1887,19 @@ function setupControls() {
     const performSearch = async () => {
         const query = searchInput.value;
         if (!query) return;
+        if (!hasInternetConnectivity()) {
+            showStatusMessage('Address search is unavailable offline (Nominatim requires internet).', 'warn', 5000);
+            return;
+        }
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Norway&limit=1`);
             const data = await res.json();
             if (data.length > 0) setUserLocation([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
             else alert("Address not found.");
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            showStatusMessage('Address search failed. Check connection and try again.', 'warn', 5000);
+        }
     };
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
@@ -1521,6 +2014,344 @@ function setUserLocation(coords, accuracyMeters) {
     calculateRoute();
 }
 
+function haversineMeters(pointA, pointB) {
+    const lon1 = pointA[0];
+    const lat1 = pointA[1];
+    const lon2 = pointB[0];
+    const lat2 = pointB[1];
+    const radius = 6371000;
+    const toRad = Math.PI / 180;
+    const phi1 = lat1 * toRad;
+    const phi2 = lat2 * toRad;
+    const dPhi = (lat2 - lat1) * toRad;
+    const dLambda = (lon2 - lon1) * toRad;
+    const a = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+    return 2 * radius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function buildOfflineRoutingAdjacency(edges, nodeCount, walkingSpeedKmh) {
+    const adjacency = Array.from({ length: nodeCount }, () => []);
+    // walkingSpeedKmh: if provided, override costS with distance-based walking time
+    const walkingCostFactor = walkingSpeedKmh ? (3600 / (walkingSpeedKmh * 1000)) : null;
+    for (const edge of edges) {
+        if (!Array.isArray(edge) || edge.length < 5) continue;
+        const from = edge[0];
+        const to = edge[1];
+        const distanceM = edge[3];
+        const costS = walkingCostFactor !== null ? distanceM * walkingCostFactor : edge[4];
+        if (!Number.isInteger(from) || !Number.isInteger(to)) continue;
+        if (from < 0 || to < 0 || from >= nodeCount || to >= nodeCount) continue;
+        if (!Number.isFinite(distanceM) || !Number.isFinite(costS)) continue;
+        adjacency[from].push({ to, distanceM, costS });
+    }
+    return adjacency;
+}
+
+function getOfflineGridKey(lng, lat) {
+    const x = Math.floor(lng / OFFLINE_ROUTING_GRID_SIZE_DEG);
+    const y = Math.floor(lat / OFFLINE_ROUTING_GRID_SIZE_DEG);
+    return `${x}:${y}`;
+}
+
+function buildOfflineRoutingSpatialIndex(nodes) {
+    const grid = new Map();
+    for (let i = 0; i < nodes.length; i += 1) {
+        const node = nodes[i];
+        if (!Array.isArray(node) || node.length < 2) continue;
+        const key = getOfflineGridKey(node[0], node[1]);
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(i);
+    }
+    return grid;
+}
+
+function makeOfflineGraphMode(edges, nodeCount, walkingSpeedKmh) {
+    return {
+        edges,
+        adjacency: buildOfflineRoutingAdjacency(edges, nodeCount, walkingSpeedKmh)
+    };
+}
+
+async function loadOfflineRoutingGraph() {
+    if (offlineRoutingGraphState) return offlineRoutingGraphState;
+    if (offlineRoutingGraphPromise) return offlineRoutingGraphPromise;
+
+    offlineRoutingGraphPromise = (async () => {
+        const response = await fetch(OFFLINE_ROUTING_GRAPH_PATH);
+        if (!response.ok) {
+            throw new Error(`Offline graph fetch failed with status ${response.status}`);
+        }
+
+        const decodeJsonPayload = async () => {
+            const isGzipAsset = OFFLINE_ROUTING_GRAPH_PATH.endsWith('.gz');
+
+            if (isGzipAsset) {
+                // If the server already decoded Content-Encoding:gzip the response body
+                // is plain JSON. Detect that by checking for a JSON opening character.
+                const rawBuffer = await response.arrayBuffer();
+                const firstByte = new Uint8Array(rawBuffer)[0];
+                const isActuallyGzip = firstByte === 0x1f; // gzip magic byte
+
+                if (!isActuallyGzip) {
+                    // Server transparently decoded it — just parse as text
+                    return JSON.parse(new TextDecoder().decode(rawBuffer));
+                }
+
+                if (typeof DecompressionStream !== 'undefined') {
+                    const blob = new Blob([rawBuffer]);
+                    const decompressedStream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
+                    const text = await new Response(decompressedStream).text();
+                    return JSON.parse(text);
+                }
+
+                // DecompressionStream unavailable — manual inflate via pako if loaded,
+                // otherwise throw a clear message so the status bar shows it.
+                if (typeof pako !== 'undefined') {
+                    const inflated = pako.inflate(new Uint8Array(rawBuffer), { to: 'string' });
+                    return JSON.parse(inflated);
+                }
+
+                throw new Error(
+                    'Offline graph: browser lacks DecompressionStream and pako is not loaded. ' +
+                    'Try a modern browser (Chrome 80+, Firefox 113+, Safari 16.4+).'
+                );
+            }
+
+            return response.json();
+        };
+
+        const payload = await decodeJsonPayload();
+        const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+        const drivingEdges = payload.graphs && Array.isArray(payload.graphs.driving) ? payload.graphs.driving : [];
+        const walkingSpeedKmh = (payload.metadata && payload.metadata.walkingSpeedKmh) || 5.0;
+
+        if (!nodes.length || !drivingEdges.length) {
+            throw new Error('Offline graph is empty or invalid');
+        }
+
+        offlineRoutingGraphState = {
+            nodes,
+            spatialIndex: buildOfflineRoutingSpatialIndex(nodes),
+            modes: {
+                driving: makeOfflineGraphMode(drivingEdges, nodes.length),
+                walking: makeOfflineGraphMode(drivingEdges, nodes.length, walkingSpeedKmh)
+            }
+        };
+
+        return offlineRoutingGraphState;
+    })();
+
+    try {
+        return await offlineRoutingGraphPromise;
+    } finally {
+        offlineRoutingGraphPromise = null;
+    }
+}
+
+function findNearestGraphNodeIndex(coords, graphState) {
+    const lng = coords[0];
+    const lat = coords[1];
+    const cellX = Math.floor(lng / OFFLINE_ROUTING_GRID_SIZE_DEG);
+    const cellY = Math.floor(lat / OFFLINE_ROUTING_GRID_SIZE_DEG);
+
+    let bestIndex = null;
+    let bestDistance = Infinity;
+
+    for (let ring = 0; ring <= OFFLINE_ROUTING_MAX_SNAP_RINGS; ring += 1) {
+        const minX = cellX - ring;
+        const maxX = cellX + ring;
+        const minY = cellY - ring;
+        const maxY = cellY + ring;
+
+        for (let x = minX; x <= maxX; x += 1) {
+            for (let y = minY; y <= maxY; y += 1) {
+                const isBorder = ring === 0 || x === minX || x === maxX || y === minY || y === maxY;
+                if (!isBorder) continue;
+
+                const key = `${x}:${y}`;
+                const nodeIndexes = graphState.spatialIndex.get(key);
+                if (!nodeIndexes) continue;
+
+                for (const nodeIndex of nodeIndexes) {
+                    const nodeCoords = graphState.nodes[nodeIndex];
+                    const distanceM = haversineMeters(coords, nodeCoords);
+                    if (distanceM < bestDistance) {
+                        bestDistance = distanceM;
+                        bestIndex = nodeIndex;
+                    }
+                }
+            }
+        }
+
+        if (bestIndex !== null && bestDistance <= OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M) {
+            return { nodeIndex: bestIndex, distanceM: bestDistance };
+        }
+    }
+
+    if (bestIndex !== null) {
+        return { nodeIndex: bestIndex, distanceM: bestDistance };
+    }
+
+    return null;
+}
+
+class MinHeap {
+    constructor() {
+        this.items = [];
+    }
+
+    get size() {
+        return this.items.length;
+    }
+
+    push(item) {
+        this.items.push(item);
+        this.bubbleUp(this.items.length - 1);
+    }
+
+    pop() {
+        if (!this.items.length) return null;
+        const first = this.items[0];
+        const last = this.items.pop();
+        if (this.items.length && last) {
+            this.items[0] = last;
+            this.bubbleDown(0);
+        }
+        return first;
+    }
+
+    bubbleUp(index) {
+        while (index > 0) {
+            const parent = Math.floor((index - 1) / 2);
+            if (this.items[parent].priority <= this.items[index].priority) break;
+            const tmp = this.items[parent];
+            this.items[parent] = this.items[index];
+            this.items[index] = tmp;
+            index = parent;
+        }
+    }
+
+    bubbleDown(index) {
+        const length = this.items.length;
+        while (true) {
+            let smallest = index;
+            const left = (2 * index) + 1;
+            const right = (2 * index) + 2;
+
+            if (left < length && this.items[left].priority < this.items[smallest].priority) {
+                smallest = left;
+            }
+            if (right < length && this.items[right].priority < this.items[smallest].priority) {
+                smallest = right;
+            }
+            if (smallest === index) break;
+
+            const tmp = this.items[index];
+            this.items[index] = this.items[smallest];
+            this.items[smallest] = tmp;
+            index = smallest;
+        }
+    }
+}
+
+function runOfflineAStar(graphState, modeKey, startIndex, endIndex) {
+    const mode = graphState.modes[modeKey];
+    if (!mode) throw new Error(`Unsupported offline mode: ${modeKey}`);
+
+    const nodeCount = graphState.nodes.length;
+    const bestCost = new Array(nodeCount).fill(Infinity);
+    const bestDistance = new Array(nodeCount).fill(Infinity);
+    const previous = new Array(nodeCount).fill(-1);
+    const heap = new MinHeap();
+
+    bestCost[startIndex] = 0;
+    bestDistance[startIndex] = 0;
+    heap.push({ node: startIndex, priority: 0 });
+
+    while (heap.size > 0) {
+        const current = heap.pop();
+        if (!current) break;
+        const currentNode = current.node;
+
+        if (currentNode === endIndex) break;
+        if (current.priority > bestCost[currentNode] + 1e-9) continue;
+
+        const neighbors = mode.adjacency[currentNode];
+        for (const edge of neighbors) {
+            const nextNode = edge.to;
+            const nextCost = bestCost[currentNode] + edge.costS;
+            if (nextCost >= bestCost[nextNode]) continue;
+
+            bestCost[nextNode] = nextCost;
+            bestDistance[nextNode] = bestDistance[currentNode] + edge.distanceM;
+            previous[nextNode] = currentNode;
+
+            const heuristic = haversineMeters(graphState.nodes[nextNode], graphState.nodes[endIndex]) / OFFLINE_ROUTING_HEURISTIC_SPEED_MPS;
+            heap.push({ node: nextNode, priority: nextCost + heuristic });
+        }
+    }
+
+    if (!Number.isFinite(bestCost[endIndex])) {
+        return null;
+    }
+
+    const nodePath = [];
+    let cursor = endIndex;
+    while (cursor !== -1) {
+        nodePath.push(cursor);
+        if (cursor === startIndex) break;
+        cursor = previous[cursor];
+    }
+
+    if (!nodePath.length || nodePath[nodePath.length - 1] !== startIndex) {
+        return null;
+    }
+
+    nodePath.reverse();
+
+    return {
+        nodePath,
+        distanceM: bestDistance[endIndex],
+        durationS: bestCost[endIndex]
+    };
+}
+
+async function buildOfflineGraphRoute(startCoords, endCoords, modeKey) {
+    const graphState = await loadOfflineRoutingGraph();
+    const startSnap = findNearestGraphNodeIndex(startCoords, graphState);
+    const endSnap = findNearestGraphNodeIndex(endCoords, graphState);
+
+    if (!startSnap || !endSnap) {
+        throw new Error('Could not snap route endpoints to offline graph nodes');
+    }
+
+    if (
+        startSnap.distanceM > OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M ||
+        endSnap.distanceM > OFFLINE_ROUTING_MAX_SNAP_DISTANCE_M
+    ) {
+        throw new Error('Route endpoints are too far from the offline graph');
+    }
+
+    const solved = runOfflineAStar(graphState, modeKey, startSnap.nodeIndex, endSnap.nodeIndex);
+    if (!solved) {
+        throw new Error('Offline graph route was not found');
+    }
+
+    const lineCoords = solved.nodePath.map((nodeIndex) => graphState.nodes[nodeIndex]);
+    if (lineCoords.length < 2) {
+        throw new Error('Offline graph route is too short');
+    }
+
+    return {
+        geometry: {
+            type: 'LineString',
+            coordinates: lineCoords
+        },
+        distanceKm: solved.distanceM / 1000,
+        durationMin: solved.durationS / 60
+    };
+}
+
 async function calculateRoute() {
     if (!currentPos || !mapLoaded) return;
     const category = activeCategory;
@@ -1542,29 +2373,108 @@ async function calculateRoute() {
         profile = 'foot';
     }
 
+    const offlineAtRequest = !hasInternetConnectivity();
+
+    const setRouteResult = (distanceKm, durationMin, destinationLabel, isFallback, fallbackLabel = 'offline estimate') => {
+        document.getElementById('result-area').style.display = 'block';
+        document.getElementById('res-info').innerText = `${Math.round(durationMin)} min  ·  ${distanceKm.toFixed(1)} km`;
+        const resDest = document.getElementById('res-dest');
+        const resultToLabel = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].resultTo) || (TRANSLATIONS.en && TRANSLATIONS.en.resultTo) || 'To:';
+        resDest.textContent = '';
+        resDest.appendChild(document.createTextNode(`${resultToLabel} `));
+        const destNameEl = document.createElement('b');
+        destNameEl.textContent = destinationLabel;
+        resDest.appendChild(destNameEl);
+        if (isFallback) {
+            resDest.appendChild(document.createTextNode(` (${fallbackLabel})`));
+        }
+    };
+
+    const showDestinationMarker = () => {
+        if (destinationMarker) destinationMarker.remove();
+        const destEl = document.createElement('div');
+        destEl.className = 'destination-marker-el';
+        const catColors = { tilfluktsrom: '#f59e0b', brannstasjoner: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
+        const catIcons = { tilfluktsrom: 'fa-shield-halved', brannstasjoner: 'fa-fire-extinguisher', sykehus: 'fa-hospital', drikkevann: 'fa-droplet' };
+        const iconColor = catColors[category] || '#374151';
+        const iconName = catIcons[category] || 'fa-location-dot';
+        destEl.innerHTML = `<div style="background:white;border:3px solid ${iconColor};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);"><i class="fa-solid ${iconName}" style="color:${iconColor};font-size:16px;"></i></div>`;
+        destinationMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
+            .setLngLat(destCoords)
+            .addTo(map);
+    };
+
+    const fitRoute = (geometry, padding = 60) => {
+        const bounds = new maplibregl.LngLatBounds();
+        geometry.coordinates.forEach(c => bounds.extend(c));
+        map.fitBounds(bounds, buildViewModeCameraOptions({ padding }));
+    };
+
+    const tryOfflineGraphRoute = async () => {
+        const modeKey = transportMode === 'walking' ? 'walking' : 'driving';
+        const offlineRoute = await buildOfflineGraphRoute(currentPos, destCoords, modeKey);
+        map.getSource('route').setData(offlineRoute.geometry);
+        fitRoute(offlineRoute.geometry, 50);
+        showDestinationMarker();
+
+        const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
+        setRouteResult(offlineRoute.distanceKm, offlineRoute.durationMin, destName, true, 'offline graph');
+    };
+
+    const setStraightLineRoute = () => {
+        const line = turf.lineString([currentPos, destCoords]);
+        map.getSource('route').setData(line.geometry);
+
+        const distanceKm = turf.distance(turf.point(currentPos), turf.point(destCoords), { units: 'kilometers' });
+        const speed = OFFLINE_ROUTE_SPEED_KMH[transportMode] || 30;
+        const durationMin = (distanceKm / speed) * 60;
+        const destName = props.navn || props.name || props.adresse || props.brannstasjon || 'Destination';
+
+        fitRoute(line.geometry, 50);
+        showDestinationMarker();
+        setRouteResult(distanceKm, durationMin, destName, true);
+    };
+
+    if (offlineAtRequest) {
+        try {
+            await tryOfflineGraphRoute();
+            showStatusMessage('Offline: route calculated from local road graph.', 'info', 5000);
+            return;
+        } catch (offlineError) {
+            console.warn('Offline graph routing failed:', offlineError);
+            setStraightLineRoute();
+            showStatusMessage(
+                `Offline routing failed (${offlineError.message}) — showing straight-line estimate.`,
+                'warn',
+                9000
+            );
+            return;
+        }
+    }
+
     try {
-        const res = await fetch(`${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`);
+        const routeRequestUrl = `${serviceUrl}/${profile}/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`;
+        const osrmController = new AbortController();
+        const osrmTimeout = window.setTimeout(() => osrmController.abort(), 9000);
+        let res;
+        try {
+            res = await fetch(routeRequestUrl, { signal: osrmController.signal });
+        } finally {
+            window.clearTimeout(osrmTimeout);
+        }
+
+        if (!res.ok) {
+            throw new Error(`Routing request failed with status ${res.status}`);
+        }
+
         const json = await res.json();
 
         if (json.routes && json.routes.length > 0) {
             const route = json.routes[0];
             map.getSource('route').setData(route.geometry);
 
-            const bounds = new maplibregl.LngLatBounds();
-            route.geometry.coordinates.forEach(c => bounds.extend(c));
-            map.fitBounds(bounds, buildViewModeCameraOptions({ padding: 60 }));
-
-            if (destinationMarker) destinationMarker.remove();
-            const destEl = document.createElement('div');
-            destEl.className = 'destination-marker-el';
-            const catColors = { tilfluktsrom: '#f59e0b', brannstasjoner: '#ef4444', sykehus: '#10b981', drikkevann: '#3b82f6' };
-            const catIcons = { tilfluktsrom: 'fa-shield-halved', brannstasjoner: 'fa-fire-extinguisher', sykehus: 'fa-hospital', drikkevann: 'fa-droplet' };
-            const iconColor = catColors[category] || '#374151';
-            const iconName = catIcons[category] || 'fa-location-dot';
-            destEl.innerHTML = `<div style="background:white;border:3px solid ${iconColor};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.3);"><i class="fa-solid ${iconName}" style="color:${iconColor};font-size:16px;"></i></div>`;
-            destinationMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
-                .setLngLat(destCoords)
-                .addTo(map);
+            fitRoute(route.geometry, 60);
+            showDestinationMarker();
 
             const mins = Math.round(route.duration / 60);
             const km = (route.distance / 1000).toFixed(1);
@@ -1575,8 +2485,25 @@ async function calculateRoute() {
             const t = TRANSLATIONS[currentLang];
             const fromLabel = pinpointMarker ? `<span style="font-size:11px;color:#6b7280;font-weight:600;"><i class="fa-solid fa-map-pin" style="color:#e11d48;margin-right:3px;"></i>${t.resultFrom}</span><br>` : '';
             document.getElementById('res-dest').innerHTML = `${fromLabel}${t.resultTo} <b>${destName}</b>`;
+            return;
         }
-    } catch (err) { console.error("Routing error:", err); }
+
+        throw new Error('No route returned');
+    } catch (err) {
+        console.error("Routing error:", err);
+        try {
+            await tryOfflineGraphRoute();
+            showStatusMessage('Online routing unavailable, used local offline road graph.', 'warn', 6000);
+        } catch (offlineError) {
+            console.warn('Offline graph fallback after online routing failure also failed:', offlineError);
+            setStraightLineRoute();
+            showStatusMessage(
+                `Routing unavailable (${offlineError.message}) — showing straight-line estimate.`,
+                'warn',
+                9000
+            );
+        }
+    }
 }
 
 function loadTilfluktsromIcon(mapInstance) {

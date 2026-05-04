@@ -1,0 +1,19 @@
+{
+  "name": "Beredskaps Kart",
+  "short_name": "Beredskap",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#2563eb",
+  "lang": "no",
+  "description": "Offline-vennlig beredskapskart med lokale krisedata.",
+  "icons": [
+    {
+      "src": "./icons/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
