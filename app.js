@@ -32,6 +32,15 @@ const TRANSLATIONS = {
         noResults: 'No resources found within radius.',
         resourcesWithin: 'resource(s) within',
         meters: 'm',
+        shelterTotalCapacity: 'Total capacity',
+        shelterAvailableNow: 'Available now',
+        shelterLastReported: 'Last reported',
+        shelterNoReport: 'No report yet',
+        shelterReportLabel: 'Report available spots:',
+        shelterSubmit: 'Submit report',
+        shelterReportSent: 'Report sent ✓',
+        shelterReportError: 'Error sending report',
+        shelterLoading: 'Loading…',
     },
     no: {
         searchPlaceholder: 'Søk etter adresse...',
@@ -65,6 +74,15 @@ const TRANSLATIONS = {
         noResults: 'Ingen ressurser funnet innenfor radius.',
         resourcesWithin: 'ressurs(er) innenfor',
         meters: 'm',
+        shelterTotalCapacity: 'Total kapasitet',
+        shelterAvailableNow: 'Ledig nå',
+        shelterLastReported: 'Sist rapportert',
+        shelterNoReport: 'Ingen rapport ennå',
+        shelterReportLabel: 'Rapporter ledige plasser:',
+        shelterSubmit: 'Send rapport',
+        shelterReportSent: 'Rapport sendt ✓',
+        shelterReportError: 'Feil ved sending',
+        shelterLoading: 'Laster…',
     },
     de: {
         searchPlaceholder: 'Adresse suchen...',
@@ -98,6 +116,15 @@ const TRANSLATIONS = {
         noResults: 'Keine Ressourcen im Radius gefunden.',
         resourcesWithin: 'Ressource(n) innerhalb',
         meters: 'm',
+        shelterTotalCapacity: 'Gesamtkapazität',
+        shelterAvailableNow: 'Verfügbar jetzt',
+        shelterLastReported: 'Zuletzt gemeldet',
+        shelterNoReport: 'Noch kein Bericht',
+        shelterReportLabel: 'Freie Plätze melden:',
+        shelterSubmit: 'Bericht senden',
+        shelterReportSent: 'Bericht gesendet ✓',
+        shelterReportError: 'Fehler beim Senden',
+        shelterLoading: 'Lädt…',
     },
     fr: {
         searchPlaceholder: 'Rechercher une adresse...',
@@ -131,6 +158,15 @@ const TRANSLATIONS = {
         noResults: 'Aucune ressource trouvée dans le rayon.',
         resourcesWithin: 'ressource(s) dans',
         meters: 'm',
+        shelterTotalCapacity: 'Capacité totale',
+        shelterAvailableNow: 'Disponible maintenant',
+        shelterLastReported: 'Dernière déclaration',
+        shelterNoReport: 'Aucun rapport',
+        shelterReportLabel: 'Signaler les places disponibles:',
+        shelterSubmit: 'Envoyer rapport',
+        shelterReportSent: 'Rapport envoyé ✓',
+        shelterReportError: 'Erreur d\'envoi',
+        shelterLoading: 'Chargement…',
     },
     uk: {
         searchPlaceholder: 'Пошук адреси...',
@@ -164,6 +200,15 @@ const TRANSLATIONS = {
         noResults: 'Ресурсів у радіусі не знайдено.',
         resourcesWithin: 'ресурс(ів) у межах',
         meters: 'м',
+        shelterTotalCapacity: 'Загальна місткість',
+        shelterAvailableNow: 'Доступно зараз',
+        shelterLastReported: 'Остання доповідь',
+        shelterNoReport: 'Звітів ще немає',
+        shelterReportLabel: 'Повідомити про вільні місця:',
+        shelterSubmit: 'Надіслати звіт',
+        shelterReportSent: 'Звіт надіслано ✓',
+        shelterReportError: 'Помилка надсилання',
+        shelterLoading: 'Завантаження…',
     }
 };
 
@@ -657,6 +702,20 @@ async function fetchGeoJSON(tableName) {
     }).filter(f => f !== null);
 
     console.log(`Ferdig behandlet ${features.length} punkter for ${tableName}.`);
+
+    // If Supabase returned 0 rows (table empty / never uploaded), fall back to local GeoJSON
+    if (features.length === 0) {
+        try {
+            const localData = await fetchLocalGeoJSON(tableName);
+            if (localData && localData.features && localData.features.length > 0) {
+                console.log(`Supabase tom for ${tableName}, bruker lokale data (${localData.features.length} features).`);
+                return localData;
+            }
+        } catch (localError) {
+            console.warn(`Lokal fallback for ${tableName} feilet:`, localError);
+        }
+    }
+
     return normalizeGeoJSONToPoints({ type: 'FeatureCollection', features }, tableName);
 }
 
@@ -1800,12 +1859,129 @@ map.on('zoom', updateMapScale);
 map.on('move', updateMapScale);
 map.on('load', updateMapScale);
 
+// --- SHELTER CAPACITY REPORTING ---
+function _escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function fetchLatestCapacityReport(romnr) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('shelter_capacity_reports')
+            .select('ledig_plasser, rapportert_tid')
+            .eq('romnr', romnr)
+            .order('rapportert_tid', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (error) return null;
+        return data;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function submitCapacityReport(romnr, ledigPlasser) {
+    try {
+        const { error } = await supabaseClient
+            .from('shelter_capacity_reports')
+            .insert({ romnr: romnr, ledig_plasser: ledigPlasser });
+        if (error) {
+            console.error('submitCapacityReport feil:', error.message, error.details, error.hint);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('submitCapacityReport exception:', e);
+        return false;
+    }
+}
+
+function renderCapacityStatus(statusEl, report, totalPlasser, t) {
+    if (!statusEl) return;
+    if (!report) {
+        statusEl.textContent = t.shelterNoReport;
+        return;
+    }
+    const ledig = report.ledig_plasser;
+    const pct = totalPlasser > 0 ? Math.round((ledig / totalPlasser) * 100) : 0;
+    const color = pct > 50 ? '#10b981' : pct > 20 ? '#f59e0b' : '#ef4444';
+    const locale = currentLang === 'no' ? 'nb-NO' : currentLang === 'uk' ? 'uk-UA' : currentLang === 'de' ? 'de-DE' : currentLang === 'fr' ? 'fr-FR' : 'en-US';
+    const time = new Date(report.rapportert_tid).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+    statusEl.innerHTML =
+        `<div style="font-size:13px;"><span style="color:#6b7280;">${t.shelterAvailableNow}:</span> ` +
+        `<b style="color:${color};">${ledig}</b> / ${totalPlasser}</div>` +
+        `<div class="capacity-bar"><div class="capacity-bar-fill" style="width:${pct}%;background:${color};"></div></div>` +
+        `<div style="font-size:11px;color:#9ca3af;">${t.shelterLastReported}: ${time}</div>`;
+}
+
 // INTERACTION
-map.on('click', 'tilfluktsrom-layer', (e) => {
+map.on('click', 'tilfluktsrom-layer', async (e) => {
     const p = e.features[0].properties;
-    const plasser = p.plasser ? `<br><b>Capacity:</b> ${p.plasser}` : '';
-    const adresse = p.adresse ? `<br><b>Address:</b> ${p.adresse}` : '';
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>SHELTER</b>${adresse}${plasser}`).addTo(map);
+    const t = TRANSLATIONS[currentLang];
+    const totalPlasser = parseInt(p.plasser, 10) || 0;
+    const romnr = parseInt(p.romnr, 10);
+    const adresse = p.adresse ? _escHtml(p.adresse) : '';
+    const uid = `sp-${Date.now()}`;
+
+    const popup = new maplibregl.Popup({ maxWidth: '270px' })
+        .setLngLat(e.lngLat)
+        .setHTML(
+            `<div style="font-family:inherit;min-width:200px;">` +
+            `<b style="font-size:14px;">🏠 TILFLUKTSROM</b>` +
+            (adresse ? `<div style="margin-top:4px;font-size:12px;color:#374151;">${adresse}</div>` : '') +
+            `<div style="margin-top:8px;font-size:13px;"><span style="color:#6b7280;">${t.shelterTotalCapacity}:</span> <b>${totalPlasser}</b></div>` +
+            `<div id="${uid}-status" style="margin-top:4px;font-size:12px;color:#6b7280;">${t.shelterLoading}</div>` +
+            `<div class="shelter-popup-form">` +
+            `<div style="font-size:12px;font-weight:600;margin-bottom:2px;">${t.shelterReportLabel}</div>` +
+            `<input id="${uid}-input" type="number" min="0" max="${totalPlasser}" placeholder="0 – ${totalPlasser}" />` +
+            `<button id="${uid}-btn">${t.shelterSubmit}</button>` +
+            `<div id="${uid}-msg" style="font-size:11px;margin-top:4px;display:none;"></div>` +
+            `</div></div>`
+        )
+        .addTo(map);
+
+    // Attach submit handler after popup is in DOM
+    const btn = document.getElementById(`${uid}-btn`);
+    if (btn) {
+        btn.addEventListener('click', async () => {
+            const input = document.getElementById(`${uid}-input`);
+            const msgEl = document.getElementById(`${uid}-msg`);
+            const val = parseInt(input?.value, 10);
+            if (isNaN(val) || val < 0 || (totalPlasser > 0 && val > totalPlasser)) {
+                input.style.borderColor = '#ef4444';
+                return;
+            }
+            input.style.borderColor = '#d1d5db';
+            btn.disabled = true;
+            btn.textContent = '…';
+            const ok = await submitCapacityReport(romnr, val);
+            const tNow = TRANSLATIONS[currentLang];
+            if (ok) {
+                msgEl.textContent = tNow.shelterReportSent;
+                msgEl.style.color = '#10b981';
+                msgEl.style.display = 'block';
+                btn.textContent = tNow.shelterSubmit;
+                btn.disabled = false;
+                // Refresh the status display
+                const report = await fetchLatestCapacityReport(romnr);
+                renderCapacityStatus(document.getElementById(`${uid}-status`), report, totalPlasser, tNow);
+            } else {
+                msgEl.textContent = tNow.shelterReportError;
+                msgEl.style.color = '#ef4444';
+                msgEl.style.display = 'block';
+                btn.textContent = tNow.shelterSubmit;
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // Load and render existing report
+    const report = await fetchLatestCapacityReport(romnr);
+    renderCapacityStatus(document.getElementById(`${uid}-status`), report, totalPlasser, t);
 });
 
 map.on('click', 'brannstasjoner-layer', (e) => {

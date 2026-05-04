@@ -1,4 +1,4 @@
-const CACHE_NAME = 'beredskapskart-v3';
+const CACHE_NAME = 'beredskapskart-v4';
 const APP_SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -46,6 +46,20 @@ function isSameOriginAsset(requestUrl) {
   return requestUrl.origin === self.location.origin;
 }
 
+// JS/HTML/CSS — fetch from network first so code updates always take effect
+function isAppShellCode(requestUrl) {
+  const p = requestUrl.pathname;
+  return p === '/' || p === '/index.html' || p === '/app.js' ||
+    p.endsWith('.css') || p.endsWith('.js');
+}
+
+// GeoJSON data and icons — cache-first for offline availability
+function isOfflineData(requestUrl) {
+  const p = requestUrl.pathname;
+  return p.startsWith('/data/') || p.startsWith('/icons/') ||
+    p === '/manifest.webmanifest';
+}
+
 function isTileRequest(requestUrl) {
   return requestUrl.hostname.endsWith('tile.openstreetmap.org');
 }
@@ -86,21 +100,37 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isSameOriginAsset(requestUrl)) {
-    event.respondWith((async () => {
-      const cached = await caches.match(request);
-      if (cached) return cached;
-
-      try {
-        const networkResponse = await fetch(request);
-        if (shouldCacheNetworkResponse(networkResponse)) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, networkResponse.clone());
+    if (isAppShellCode(requestUrl)) {
+      // Network-first: always load the latest JS/HTML/CSS when online
+      event.respondWith((async () => {
+        try {
+          const networkResponse = await fetch(request);
+          if (shouldCacheNetworkResponse(networkResponse)) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch {
+          return (await caches.match(request)) || Response.error();
         }
-        return networkResponse;
-      } catch {
-        return cached || Response.error();
-      }
-    })());
+      })());
+    } else if (isOfflineData(requestUrl)) {
+      // Cache-first: geojson/icons available offline
+      event.respondWith((async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        try {
+          const networkResponse = await fetch(request);
+          if (shouldCacheNetworkResponse(networkResponse)) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch {
+          return Response.error();
+        }
+      })());
+    }
     return;
   }
 

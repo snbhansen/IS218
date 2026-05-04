@@ -939,6 +939,59 @@
         .pinpoint-coords-popup .maplibregl-popup-tip { display: none; }
         .pinpoint-coords-popup { pointer-events: none; }
 
+        /* ── Shelter capacity popup ── */
+        .shelter-popup-form {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .shelter-popup-form input[type="number"] {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 4px 0 6px;
+            box-sizing: border-box;
+            font-family: inherit;
+            outline: none;
+        }
+        .shelter-popup-form input[type="number"]:focus {
+            border-color: #2563eb;
+        }
+        .shelter-popup-form button {
+            width: 100%;
+            padding: 7px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .shelter-popup-form button:hover:not(:disabled) {
+            background: #1d4ed8;
+        }
+        .shelter-popup-form button:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+        .capacity-bar {
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            margin: 4px 0;
+            overflow: hidden;
+        }
+        .capacity-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.4s ease, background 0.4s ease;
+        }
+
         /* ── Route result card ── */
         .route-result-header {
             display: flex;
